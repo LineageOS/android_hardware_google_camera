@@ -475,6 +475,9 @@ bool EmulatedSensor::IsStreamCombinationSupported(
       switch (stream.format) {
         case HAL_PIXEL_FORMAT_BLOB:
           if ((stream.data_space != HAL_DATASPACE_V0_JFIF) &&
+              (stream.data_space !=
+               static_cast<android_dataspace_t>(
+                   aidl::android::hardware::graphics::common::Dataspace::JPEG_R)) &&
               (stream.data_space != HAL_DATASPACE_UNKNOWN)) {
             ALOGE("%s: Unsupported Blob dataspace 0x%x", __FUNCTION__,
                   stream.data_space);
@@ -528,10 +531,10 @@ bool EmulatedSensor::IsStreamCombinationSupported(
           is_dynamic_output
               ? physical_map.at(stream.physical_camera_id)
                     ->GetDynamicPhysicalStreamOutputSizes(stream.format)
-              : stream.is_physical_camera_stream
-                    ? physical_map.at(stream.physical_camera_id)
-                          ->GetOutputSizes(stream.format)
-                    : config_map.GetOutputSizes(stream.format);
+          : stream.is_physical_camera_stream
+              ? physical_map.at(stream.physical_camera_id)
+                    ->GetOutputSizes(stream.format, stream.data_space)
+              : config_map.GetOutputSizes(stream.format, stream.data_space);
 
       auto stream_size = std::make_pair(stream.width, stream.height);
       if (output_sizes.find(stream_size) == output_sizes.end()) {
@@ -1108,6 +1111,60 @@ bool EmulatedSensor::threadLoop() {
 
             Mutex::Autolock lock(control_mutex_);
             jpeg_compressor_->QueueYUV420(std::move(jpeg_job));
+          } else if ((*b)->dataSpace == static_cast<android_dataspace_t>(
+                                            aidl::android::hardware::graphics::
+                                                common::Dataspace::JPEG_R)) {
+            if (!reprocess_request) {
+              YUV420Frame yuv_input{};
+              auto jpeg_input = std::make_unique<JpegYUV420Input>();
+              jpeg_input->width = (*b)->width;
+              jpeg_input->height = (*b)->height;
+              jpeg_input->color_space = (*b)->color_space;
+              auto img = new uint8_t[(*b)->width * (*b)->height * 3];
+              jpeg_input->yuv_planes = {
+                  .img_y = img,
+                  .img_cb = img + (*b)->width * (*b)->height * 2,
+                  .img_cr = img + (*b)->width * (*b)->height * 2 + 2,
+                  .y_stride = (*b)->width * 2,
+                  .cbcr_stride = (*b)->width * 2,
+                  .cbcr_step = 2,
+                  .bytesPerPixel = 2};
+              jpeg_input->buffer_owner = true;
+              YUV420Frame yuv_output{.width = jpeg_input->width,
+                                     .height = jpeg_input->height,
+                                     .planes = jpeg_input->yuv_planes};
+
+              bool rotate = device_settings->second.rotate_and_crop ==
+                            ANDROID_SCALER_ROTATE_AND_CROP_90;
+              auto ret = ProcessYUV420(
+                  yuv_input, yuv_output, device_settings->second.gain,
+                  process_type, device_settings->second.zoom_ratio, rotate,
+                  (*b)->color_space, device_chars->second);
+              if (ret != 0) {
+                (*b)->stream_buffer.status = BufferStatus::kError;
+                break;
+              }
+
+              auto jpeg_job = std::make_unique<JpegYUV420Job>();
+              jpeg_job->exif_utils = std::unique_ptr<ExifUtils>(
+                  ExifUtils::Create(device_chars->second));
+              jpeg_job->input = std::move(jpeg_input);
+              // If jpeg compression is successful, then the jpeg compressor
+              // must set the corresponding status.
+              (*b)->stream_buffer.status = BufferStatus::kError;
+              std::swap(jpeg_job->output, *b);
+              jpeg_job->result_metadata =
+                  HalCameraMetadata::Clone(next_result->result_metadata.get());
+
+              Mutex::Autolock lock(control_mutex_);
+              jpeg_compressor_->QueueYUV420(std::move(jpeg_job));
+            } else {
+              ALOGE(
+                  "%s: Reprocess requests with output format JPEG_R are not "
+                  "supported!",
+                  __FUNCTION__);
+              (*b)->stream_buffer.status = BufferStatus::kError;
+            }
           } else {
             ALOGE("%s: Format %x with dataspace %x is TODO", __FUNCTION__,
                   (*b)->format, (*b)->dataSpace);

@@ -266,7 +266,10 @@ status_t EmulatedRequestProcessor::GetBufferSizeAndStride(
       }
       break;
     case HAL_PIXEL_FORMAT_BLOB:
-      if (stream.override_data_space == HAL_DATASPACE_V0_JFIF) {
+      if (stream.override_data_space == HAL_DATASPACE_V0_JFIF ||
+          stream.override_data_space ==
+              static_cast<android_dataspace_t>(
+                  aidl::android::hardware::graphics::common::Dataspace::JPEG_R)) {
         *size = stream.buffer_size;
         *stride = *size;
       } else {

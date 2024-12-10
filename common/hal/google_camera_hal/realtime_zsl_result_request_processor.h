@@ -19,6 +19,7 @@
 
 #include <cstdint>
 #include <shared_mutex>
+#include <vector>
 
 #include "hal_types.h"
 #include "internal_stream_manager.h"
@@ -30,7 +31,7 @@ namespace android {
 namespace google_camera_hal {
 
 // RealtimeZslResultRequestProcessor implements a RealtimeZslResultProcessor
-// that return filled raw buffer and metadata to internal stream manager. It
+// that return filled buffer and metadata to internal stream manager. It
 // also implements a RequestProcess to forward the results.
 class RealtimeZslResultRequestProcessor : public RealtimeZslResultProcessor,
                                           RequestProcessor {
@@ -58,6 +59,9 @@ class RealtimeZslResultRequestProcessor : public RealtimeZslResultProcessor,
   status_t ProcessRequest(const CaptureRequest& request) override;
 
   status_t Flush() override;
+
+  void RepeatingRequestEnd(int32_t frame_number,
+                           const std::vector<int32_t>& stream_ids) override;
   // Override functions of RequestProcessor end.
 
   void UpdateOutputBufferCount(int32_t frame_number, int output_buffer_count,
@@ -66,7 +70,7 @@ class RealtimeZslResultRequestProcessor : public RealtimeZslResultProcessor,
  protected:
   RealtimeZslResultRequestProcessor(
       InternalStreamManager* internal_stream_manager, int32_t stream_id,
-      android_pixel_format_t pixel_format, uint32_t partial_result_count);
+      uint32_t partial_result_count);
 
  private:
   std::shared_mutex process_block_shared_lock_;
@@ -80,7 +84,7 @@ class RealtimeZslResultRequestProcessor : public RealtimeZslResultProcessor,
     uint32_t partial_results_received = 0;
     bool zsl_buffer_received = false;
     int framework_buffer_count = INT_MAX;
-    // Whether there were filled raw buffers that have been returned to internal
+    // Whether there were filled buffers that have been returned to internal
     // stream manager.
     bool has_returned_output_to_internal_stream_manager = false;
   };

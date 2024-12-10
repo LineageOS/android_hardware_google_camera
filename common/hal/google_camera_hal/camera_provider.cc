@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
+// #define LOG_NDEBUG 0
 #define LOG_TAG "GCH_CameraProvider"
 #define ATRACE_TAG ATRACE_TAG_CAMERA
 #include "camera_provider.h"
@@ -23,9 +23,6 @@
 #include <log/log.h>
 #include <utils/Trace.h>
 
-#if !GCH_HWL_USE_DLOPEN
-#include "lyric_hwl/madvise_library_list.h"
-#endif
 #include "vendor_tag_defs.h"
 #include "vendor_tag_utils.h"
 
@@ -280,17 +277,8 @@ status_t CameraProvider::CreateCameraDevice(
     return res;
   }
 
-  const std::vector<std::string>* configure_streams_libs = nullptr;
-
-#if GCH_HWL_USE_DLOPEN
-  configure_streams_libs = reinterpret_cast<decltype(configure_streams_libs)>(
-      dlsym(hwl_lib_handle_, "configure_streams_libraries"));
-#else
-  configure_streams_libs = &configure_streams_libraries;
-#endif
-  *device =
-      CameraDevice::Create(std::move(camera_device_hwl),
-                           camera_allocator_hwl_.get(), configure_streams_libs);
+  *device = CameraDevice::Create(
+      std::move(camera_device_hwl), camera_allocator_hwl_.get());
   if (*device == nullptr) {
     return NO_INIT;
   }

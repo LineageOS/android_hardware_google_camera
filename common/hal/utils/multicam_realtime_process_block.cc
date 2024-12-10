@@ -14,16 +14,17 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
+// #define LOG_NDEBUG 0
 #define LOG_TAG "GCH_MultiCameraRtProcessBlock"
 #define ATRACE_TAG ATRACE_TAG_CAMERA
+#include "multicam_realtime_process_block.h"
+
 #include <log/log.h>
 #include <utils/Trace.h>
 
 #include <unordered_set>
 
 #include "hal_utils.h"
-#include "multicam_realtime_process_block.h"
 #include "result_processor.h"
 
 namespace android {
@@ -420,6 +421,15 @@ status_t MultiCameraRtProcessBlock::Flush() {
   }
 
   return result_processor_->FlushPendingRequests();
+}
+
+void MultiCameraRtProcessBlock::RepeatingRequestEnd(
+    int32_t frame_number, const std::vector<int32_t>& stream_ids) {
+  ATRACE_CALL();
+  std::shared_lock lock(configure_shared_mutex_);
+  if (!configured_streams_.empty()) {
+    device_session_hwl_->RepeatingRequestEnd(frame_number, stream_ids);
+  }
 }
 
 void MultiCameraRtProcessBlock::NotifyHwlPipelineResult(

@@ -21,6 +21,7 @@
 
 #include <memory>
 
+#include "aidl/android/hardware/graphics/common/Dataspace.h"
 #include "android/hardware/graphics/common/1.1/types.h"
 #include "hwl_types.h"
 

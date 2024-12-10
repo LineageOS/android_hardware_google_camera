@@ -46,7 +46,6 @@ apex_defaults {
     key: "com.google.emulated.camera.provider.hal.key",
     certificate: ":com.google.emulated.camera.provider.hal.certificate",
     file_contexts: "file_contexts",
-    use_vndk_as_stable: true,
     updatable: false,
     // Install the apex in /vendor/apex
     soc_specific: true,

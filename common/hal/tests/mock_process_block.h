@@ -42,6 +42,10 @@ class MockProcessBlock : public ProcessBlock {
                const CaptureRequest& remaining_session_request));
 
   MOCK_METHOD0(Flush, status_t());
+
+  MOCK_METHOD(void, RepeatingRequestEnd,
+              (int32_t frame_number, const std::vector<int32_t>& stream_ids),
+              (override));
 };
 
 }  // namespace google_camera_hal

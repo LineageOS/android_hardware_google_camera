@@ -22,6 +22,7 @@
 #include <camera_blob.h>
 #include <cutils/properties.h>
 #include <libyuv.h>
+#include <ultrahdr/jpegr.h>
 #include <utils/Log.h>
 #include <utils/Trace.h>
 
@@ -194,7 +195,10 @@ status_t JpegCompressor::QueueYUV420(std::unique_ptr<JpegYUV420Job> job) {
 
   if ((job->input.get() == nullptr) || (job->output.get() == nullptr) ||
       (job->output->format != PixelFormat::BLOB) ||
-      (job->output->dataSpace != HAL_DATASPACE_V0_JFIF)) {
+      ((job->output->dataSpace !=
+        static_cast<android_dataspace_t>(
+            ::aidl::android::hardware::graphics::common::Dataspace::JPEG_R)) &&
+       (job->output->dataSpace != HAL_DATASPACE_V0_JFIF))) {
     ALOGE("%s: Unable to find buffers for JPEG source/destination",
           __FUNCTION__);
     return BAD_VALUE;
@@ -318,15 +322,22 @@ void JpegCompressor::CompressYUV420(std::unique_ptr<JpegYUV420Job> job) {
     }
   }
 
-  auto encoded_size = CompressYUV420Frame(
-      {.output_buffer = job->output->plane.img.img,
-       .output_buffer_size = job->output->plane.img.buffer_size,
-       .yuv_planes = job->input->yuv_planes,
-       .width = job->input->width,
-       .height = job->input->height,
-       .app1_buffer = app1_buffer,
-       .app1_buffer_size = app1_buffer_size,
-       .color_space = job->input->color_space});
+  size_t encoded_size = 0;
+  YUV420Frame frame = {.output_buffer = job->output->plane.img.img,
+                       .output_buffer_size = job->output->plane.img.buffer_size,
+                       .yuv_planes = job->input->yuv_planes,
+                       .width = job->input->width,
+                       .height = job->input->height,
+                       .app1_buffer = app1_buffer,
+                       .app1_buffer_size = app1_buffer_size,
+                       .color_space = job->input->color_space};
+  if (job->output->dataSpace ==
+      static_cast<android_dataspace_t>(
+          ::aidl::android::hardware::graphics::common::Dataspace::JPEG_R)) {
+    encoded_size = JpegRCompressYUV420Frame(frame);
+  } else {
+    encoded_size = CompressYUV420Frame(frame);
+  }
   if (encoded_size > 0) {
     job->output->stream_buffer.status = BufferStatus::kOk;
   } else {
@@ -346,6 +357,44 @@ void JpegCompressor::CompressYUV420(std::unique_ptr<JpegYUV420Job> job) {
           __FUNCTION__, static_cast<unsigned>(jpeg_header_offset),
           static_cast<unsigned>(encoded_size));
   }
+}
+
+size_t JpegCompressor::JpegRCompressYUV420Frame(YUV420Frame p010_frame) {
+  ATRACE_CALL();
+
+  ultrahdr::jpegr_uncompressed_struct p010;
+  ultrahdr::jpegr_compressed_struct jpeg_r;
+  ultrahdr::JpegR jpeg_r_encoder;
+
+  p010.height = p010_frame.height;
+  p010.width = p010_frame.width;
+  p010.colorGamut = ultrahdr::ultrahdr_color_gamut::ULTRAHDR_COLORGAMUT_BT2100;
+  p010.data = p010_frame.yuv_planes.img_y;
+  p010.chroma_data = p010_frame.yuv_planes.img_cb;
+  // Strides are expected to be in pixels not bytes
+  p010.luma_stride = p010_frame.yuv_planes.y_stride / 2;
+  p010.chroma_stride = p010_frame.yuv_planes.cbcr_stride / 2;
+
+  jpeg_r.data = p010_frame.output_buffer;
+  jpeg_r.maxLength = p010_frame.output_buffer_size;
+
+  ultrahdr::ultrahdr_transfer_function transferFunction =
+      ultrahdr::ultrahdr_transfer_function::ULTRAHDR_TF_HLG;
+
+  ultrahdr::jpegr_exif_struct exif;
+  exif.data =
+      reinterpret_cast<void*>(const_cast<uint8_t*>(p010_frame.app1_buffer));
+  exif.length = p010_frame.app1_buffer_size;
+
+  auto res = jpeg_r_encoder.encodeJPEGR(&p010, transferFunction, &jpeg_r,
+                                        /*jpegQuality*/ 100, &exif);
+  if (res != OK) {
+    ALOGE("%s: Error trying to encode JPEG/R: %s (%d)", __FUNCTION__,
+          strerror(-res), res);
+    return 0;
+  }
+
+  return jpeg_r.length;
 }
 
 size_t JpegCompressor::CompressYUV420Frame(YUV420Frame frame) {

@@ -20,6 +20,8 @@
 #include <camera_device_session.h>
 #include <gmock/gmock.h>
 
+#include <vector>
+
 #include "profiler.h"
 #include "session_data_defs.h"
 
@@ -71,6 +73,9 @@ class FakeCameraDeviceSessionHwl : public CameraDeviceSessionHwl {
                           std::vector<HwlPipelineRequest>& requests) override;
 
   status_t Flush() override;
+
+  void RepeatingRequestEnd(int32_t frame_number,
+                           const std::vector<int32_t>& stream_ids) override;
 
   uint32_t GetCameraId() const override;
 
@@ -161,6 +166,10 @@ class MockDeviceSessionHwl : public CameraDeviceSessionHwl {
                         std::vector<HwlPipelineRequest>& requests));
 
   MOCK_METHOD0(Flush, status_t());
+
+  MOCK_METHOD(void, RepeatingRequestEnd,
+              (int32_t frame_number, const std::vector<int32_t>& stream_ids),
+              (override));
 
   MOCK_CONST_METHOD0(GetCameraId, uint32_t());
 

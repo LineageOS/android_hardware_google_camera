@@ -23,6 +23,7 @@
 #include "camera_device_session_hwl.h"
 #include "hal_camera_metadata.h"
 #include "hal_types.h"
+#include "hwl_types.h"
 #include "physical_camera_info_hwl.h"
 #include "profiler.h"
 
@@ -69,6 +70,9 @@ class CameraDeviceHwl : public PhysicalCameraInfoHwl {
   virtual status_t GetPhysicalCameraCharacteristics(
       uint32_t physical_camera_id,
       std::unique_ptr<HalCameraMetadata>* characteristics) const = 0;
+
+  // Get the memory config of this camera device.
+  virtual HwlMemoryConfig GetMemoryConfig() const = 0;
 
   // Set the torch mode of the camera device. The torch mode status remains
   // unchanged after this CameraDevice instance is destroyed.

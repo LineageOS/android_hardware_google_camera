@@ -21,6 +21,7 @@
 
 #include <memory>
 #include <set>
+#include <vector>
 
 #include "EmulatedCameraDeviceHWLImpl.h"
 #include "EmulatedRequestProcessor.h"
@@ -128,6 +129,9 @@ class EmulatedCameraDeviceSessionHwlImpl : public CameraDeviceSessionHwl {
 
   status_t Flush() override;
 
+  void RepeatingRequestEnd(int32_t frame_number,
+                           const std::vector<int32_t>& stream_ids) override;
+
   uint32_t GetCameraId() const override;
 
   std::vector<uint32_t> GetPhysicalCameraIds() const override;
@@ -139,9 +143,7 @@ class EmulatedCameraDeviceSessionHwlImpl : public CameraDeviceSessionHwl {
       uint32_t physical_camera_id,
       std::unique_ptr<HalCameraMetadata>* characteristics) const override;
 
-  status_t SetSessionData(SessionDataKey /*key*/
-                                    ,
-                                    void* /*value*/) override {
+  status_t SetSessionData(SessionDataKey /*key*/, void* /*value*/) override {
     return OK;
   }  // Noop for now
 

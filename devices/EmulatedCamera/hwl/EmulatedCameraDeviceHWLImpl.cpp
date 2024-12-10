@@ -182,6 +182,10 @@ status_t EmulatedCameraDeviceHwlImpl::GetPhysicalCameraCharacteristics(
   return OK;
 }
 
+google_camera_hal::HwlMemoryConfig EmulatedCameraDeviceHwlImpl::GetMemoryConfig() const {
+  return HwlMemoryConfig();
+}
+
 status_t EmulatedCameraDeviceHwlImpl::SetTorchMode(TorchMode mode) {
   if (torch_state_.get() == nullptr) {
     return INVALID_OPERATION;

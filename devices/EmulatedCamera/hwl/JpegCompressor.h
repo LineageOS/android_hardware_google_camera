@@ -93,6 +93,7 @@ class JpegCompressor {
     int32_t color_space;
   };
   size_t CompressYUV420Frame(YUV420Frame frame);
+  size_t JpegRCompressYUV420Frame(YUV420Frame p010_frame);
   void ThreadLoop();
 
   JpegCompressor(const JpegCompressor&) = delete;

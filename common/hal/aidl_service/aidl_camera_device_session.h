@@ -108,10 +108,7 @@ class AidlCameraDeviceSession
           aidl_return) override;
 
   ndk::ScopedAStatus repeatingRequestEnd(
-      int32_t /*in_frameNumber*/,
-      const std::vector<int32_t>& /*in_streamIds*/) override {
-    return ndk::ScopedAStatus::ok();
-  };
+      int32_t in_frameNumber, const std::vector<int32_t>& in_streamIds) override;
 
   ndk::ScopedAStatus configureStreamsV2(
       const aidl::android::hardware::camera::device::StreamConfiguration&,

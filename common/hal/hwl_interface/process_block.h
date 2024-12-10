@@ -19,6 +19,8 @@
 
 #include <utils/Errors.h>
 
+#include <vector>
+
 #include "camera_device_session_hwl.h"
 #include "hal_types.h"
 
@@ -94,6 +96,9 @@ class ProcessBlock {
 
   // Flush pending requests.
   virtual status_t Flush() = 0;
+
+  virtual void RepeatingRequestEnd(int32_t frame_number,
+                                   const std::vector<int32_t>& stream_ids) = 0;
 };
 
 // ExternalProcessBlockFactory defines the interface of an external process

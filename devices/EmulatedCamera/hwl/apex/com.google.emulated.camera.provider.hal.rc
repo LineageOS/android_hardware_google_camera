@@ -4,7 +4,7 @@ on property:apex.com.google.emulated.camera.provider.hal.ready=true
 
 service vendor.camera-provider-2-7-google /apex/com.google.emulated.camera.provider.hal/bin/hw/android.hardware.camera.provider@2.7-service-google
     class hal
-    user system
+    user cameraserver
     group system
     capabilities SYS_NICE
     rlimit rtprio 10 10

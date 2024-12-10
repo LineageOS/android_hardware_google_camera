@@ -17,11 +17,11 @@
 #ifndef HARDWARE_GOOGLE_CAMERA_HAL_GOOGLE_CAMERA_HAL_CAMERA_DEVICE__SESSION_H_
 #define HARDWARE_GOOGLE_CAMERA_HAL_GOOGLE_CAMERA_HAL_CAMERA_DEVICE__SESSION_H_
 
+#include <map>
 #include <memory>
 #include <set>
 #include <shared_mutex>
 #include <vector>
-#include <map>
 
 #include "camera_buffer_allocator_hwl.h"
 #include "camera_device_session_hwl.h"
@@ -117,6 +117,9 @@ class CameraDeviceSession {
 
   // Flush all pending requests.
   status_t Flush();
+
+  void RepeatingRequestEnd(int32_t frame_number,
+                           const std::vector<int32_t>& stream_ids);
 
   // Check reconfiguration is required or not
   // old_session is old session parameter

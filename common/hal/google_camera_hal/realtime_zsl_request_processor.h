@@ -18,6 +18,8 @@
 #define HARDWARE_GOOGLE_CAMERA_HAL_GOOGLE_CAMERA_HAL_REALTIME_ZSL_REQUEST_PROCESSOR_H_
 
 #include <shared_mutex>
+#include <vector>
+
 #include "process_block.h"
 #include "request_processor.h"
 #include "vendor_tag_types.h"
@@ -26,7 +28,7 @@ namespace android {
 namespace google_camera_hal {
 
 // RealtimeZslRequestProcessor implements a RequestProcessor that adds
-// internal raw stream to request and forwards the request to its ProcessBlock.
+// internal stream to request and forwards the request to its ProcessBlock.
 class RealtimeZslRequestProcessor : public RequestProcessor {
  public:
   // device_session_hwl is owned by the caller and must be valid during the
@@ -39,7 +41,7 @@ class RealtimeZslRequestProcessor : public RequestProcessor {
 
   // Override functions of RequestProcessor start.
   // RealtimeZslRequestProcessor will configure all streams in stream_config.
-  // And register one internal raw stream
+  // And register one internal stream
   status_t ConfigureStreams(
       InternalStreamManager* internal_stream_manager,
       const StreamConfiguration& stream_config,
@@ -48,19 +50,19 @@ class RealtimeZslRequestProcessor : public RequestProcessor {
   // Set the realtime process block for sending requests later.
   status_t SetProcessBlock(std::unique_ptr<ProcessBlock> process_block) override;
 
-  // Add one additional RAW output to capture request
+  // Add one additional output to capture request
   // And forwards the capture request to realtime process
   status_t ProcessRequest(const CaptureRequest& request) override;
 
   status_t Flush() override;
+
+  void RepeatingRequestEnd(int32_t frame_number,
+                           const std::vector<int32_t>& stream_ids) override;
   // Override functions of RequestProcessor end.
 
  protected:
-  RealtimeZslRequestProcessor(android_pixel_format_t pixel_format,
-                              CameraDeviceSessionHwl* device_session_hwl)
-      : pixel_format_(pixel_format),
-        device_session_hwl_(device_session_hwl),
-        is_hdrplus_zsl_enabled_(pixel_format == HAL_PIXEL_FORMAT_RAW10){};
+  RealtimeZslRequestProcessor(CameraDeviceSessionHwl* device_session_hwl)
+      : device_session_hwl_(device_session_hwl) {};
 
  private:
   status_t Initialize(CameraDeviceSessionHwl* device_session_hwl);
@@ -70,17 +72,11 @@ class RealtimeZslRequestProcessor : public RequestProcessor {
   std::unique_ptr<ProcessBlock> process_block_;
 
   InternalStreamManager* internal_stream_manager_ = nullptr;
-  android_pixel_format_t pixel_format_;
   CameraDeviceSessionHwl* device_session_hwl_ = nullptr;
   bool preview_intent_seen_ = false;
   int32_t stream_id_ = -1;
   uint32_t active_array_width_ = 0;
   uint32_t active_array_height_ = 0;
-
-  HdrMode hdr_mode_ = HdrMode::kHdrplusMode;
-
-  // If HDR+ ZSL is enabled.
-  bool is_hdrplus_zsl_enabled_ = false;
 };
 
 }  // namespace google_camera_hal

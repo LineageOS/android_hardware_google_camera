@@ -183,7 +183,8 @@ status_t EmulatedCameraDeviceSessionHwlImpl::Initialize(
   logical_chars_.emplace(camera_id_, sensor_chars_);
   for (const auto& it : *physical_device_map_) {
     SensorCharacteristics physical_chars;
-    auto stat = GetSensorCharacteristics(it.second.second.get(), &physical_chars);
+    auto stat =
+        GetSensorCharacteristics(it.second.second.get(), &physical_chars);
     if (stat == OK) {
       logical_chars_.emplace(it.first, physical_chars);
     } else {
@@ -277,9 +278,11 @@ status_t EmulatedCameraDeviceSessionHwlImpl::ConfigurePipeline(
   }
 
   *pipeline_id = pipelines_.size();
-  EmulatedPipeline emulated_pipeline{.cb = hwl_pipeline_callback,
-                                     .physical_camera_id = physical_camera_id,
-                                     .pipeline_id = *pipeline_id,};
+  EmulatedPipeline emulated_pipeline{
+      .cb = hwl_pipeline_callback,
+      .physical_camera_id = physical_camera_id,
+      .pipeline_id = *pipeline_id,
+  };
 
   emulated_pipeline.streams.reserve(request_config.streams.size());
   for (const auto& stream : request_config.streams) {
@@ -474,6 +477,10 @@ status_t EmulatedCameraDeviceSessionHwlImpl::Flush() {
   ATRACE_CALL();
   std::lock_guard<std::mutex> lock(api_mutex_);
   return request_processor_->Flush();
+}
+
+void EmulatedCameraDeviceSessionHwlImpl::RepeatingRequestEnd(
+    int32_t /*frame_number*/, const std::vector<int32_t>& /*stream_ids*/) {
 }
 
 uint32_t EmulatedCameraDeviceSessionHwlImpl::GetCameraId() const {

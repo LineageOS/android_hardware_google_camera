@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
+// #define LOG_NDEBUG 0
 #define LOG_TAG "GCH_BasicRequestProcessor"
 #define ATRACE_TAG ATRACE_TAG_CAMERA
+#include "basic_request_processor.h"
+
 #include <log/log.h>
 #include <utils/Trace.h>
-
-#include "basic_request_processor.h"
 
 namespace android {
 namespace google_camera_hal {
@@ -124,6 +124,15 @@ status_t BasicRequestProcessor::Flush() {
   }
 
   return process_block_->Flush();
+}
+
+void BasicRequestProcessor::RepeatingRequestEnd(
+    int32_t frame_number, const std::vector<int32_t>& stream_ids) {
+  ATRACE_CALL();
+  std::shared_lock lock(process_block_shared_lock_);
+  if (process_block_ != nullptr) {
+    process_block_->RepeatingRequestEnd(frame_number, stream_ids);
+  }
 }
 
 }  // namespace google_camera_hal

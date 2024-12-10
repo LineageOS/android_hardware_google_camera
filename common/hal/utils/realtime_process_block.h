@@ -56,6 +56,9 @@ class RealtimeProcessBlock : public ProcessBlock {
   status_t Flush() override;
   // Override functions of ProcessBlock end.
 
+  void RepeatingRequestEnd(int32_t frame_number,
+                           const std::vector<int32_t>& stream_ids) override;
+
  protected:
   RealtimeProcessBlock(CameraDeviceSessionHwl* device_session_hwl);
 

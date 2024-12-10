@@ -17,6 +17,8 @@
 #ifndef HARDWARE_GOOGLE_CAMERA_HAL_GOOGLE_CAMERA_HAL_SNAPSHOT_REQUEST_PROCESSOR_H_
 #define HARDWARE_GOOGLE_CAMERA_HAL_GOOGLE_CAMERA_HAL_SNAPSHOT_REQUEST_PROCESSOR_H_
 
+#include <vector>
+
 #include "process_block.h"
 #include "request_processor.h"
 
@@ -50,6 +52,9 @@ class SnapshotRequestProcessor : public RequestProcessor {
 
   status_t Flush() override;
   // Override functions of RequestProcessor end.
+
+  void RepeatingRequestEnd(int32_t frame_number,
+                           const std::vector<int32_t>& stream_ids) override;
 
  protected:
   explicit SnapshotRequestProcessor(HwlSessionCallback session_callback)

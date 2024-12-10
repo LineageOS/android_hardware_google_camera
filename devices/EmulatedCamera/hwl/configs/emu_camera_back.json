@@ -112,6 +112,45 @@
   "1.0",
   "10.0"
  ],
+ "android.depth.availableDepthMinFrameDurations": [
+  "540422489",
+  "320",
+  "240",
+  "50000000"
+ ],
+ "android.depth.availableDepthStallDurations": [
+  "540422489",
+  "320",
+  "240",
+  "50000000"
+ ],
+ "android.depth.availableDepthStreamConfigurations": [
+  "540422489",
+  "320",
+  "240",
+  "OUTPUT"
+ ],
+ "android.depth.availableDynamicDepthMinFrameDurations": [
+  "33",
+  "320",
+  "240",
+  "50000000"
+ ],
+ "android.depth.availableDynamicDepthStallDurations": [
+  "33",
+  "320",
+  "240",
+  "50000000"
+ ],
+ "android.depth.availableDynamicDepthStreamConfigurations" : [
+  "33",
+  "320",
+  "240",
+  "OUTPUT"
+ ],
+ "android.depth.depthIsExclusive": [
+  "FALSE"
+ ],
  "android.edge.availableEdgeModes": [
   "0",
   "1",
@@ -158,8 +197,36 @@
  "android.jpeg.maxSize": [
   "300000"
  ],
+ "android.lens.distortion": [
+  "0.00000000",
+  "0.00000000",
+  "0.00000000",
+  "0.00000000",
+  "0.00000000"
+ ],
  "android.lens.facing": [
   "BACK"
+ ],
+ "android.lens.intrinsicCalibration": [
+  "1914.00000",
+  "1914.00000",
+  "928.000000",
+  "696.000000",
+  "0.00000000"
+ ],
+ "android.lens.poseReference": [
+  "PRIMARY_CAMERA"
+ ],
+ "android.lens.poseRotation": [
+  "1.00000000",
+  "0.00000000",
+  "0.00000000",
+  "0.00000000"
+ ],
+ "android.lens.poseTranslation": [
+  "0.00000000",
+  "0.00000000",
+  "0.00000000"
  ],
  "android.lens.info.availableApertures": [
   "2.79999995"
@@ -203,7 +270,8 @@
   "RAW",
   "DYNAMIC_RANGE_TEN_BIT",
   "STREAM_USE_CASE",
-  "COLOR_SPACE_PROFILES"
+  "COLOR_SPACE_PROFILES",
+  "DEPTH_OUTPUT"
  ],
  "android.sensor.referenceIlluminant1": [
   "D50"
@@ -265,7 +333,7 @@
   "2",
   "3",
   "4",
-  "5",
+  "5"
  ],
  "android.reprocess.maxCaptureStall": [
   "2"
@@ -350,7 +418,12 @@
   "917513",
   "1179654",
   "851984",
-  "-2080374781"
+  "-2080374781",
+  "524294",
+  "524298",
+  "524300",
+  "524295",
+  "524301"
  ],
  "android.request.availableRequestKeys": [
   "786435",
@@ -502,7 +575,12 @@
   "1114134",
   "1703939",
   "-2080374783",
-  "-2080374782"
+  "-2080374782",
+  "524294",
+  "524298",
+  "524300",
+  "524295",
+  "524301"
  ],
  "android.request.availableSessionKeys": [
   "786435",
@@ -801,6 +879,10 @@
   "240",
   "OUTPUT",
   "33",
+  "320",
+  "240",
+  "OUTPUT",
+  "1768253795",
   "320",
   "240",
   "OUTPUT",

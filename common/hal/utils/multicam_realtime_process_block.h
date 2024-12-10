@@ -19,6 +19,7 @@
 
 #include <map>
 #include <shared_mutex>
+#include <vector>
 
 #include "pipeline_request_id_manager.h"
 #include "process_block.h"
@@ -57,6 +58,9 @@ class MultiCameraRtProcessBlock : public ProcessBlock {
       const CaptureRequest& remaining_session_request) override;
 
   status_t Flush() override;
+
+  void RepeatingRequestEnd(int32_t frame_number,
+                           const std::vector<int32_t>& stream_ids) override;
   // Override functions of ProcessBlock end.
 
   // Prepare pipeline by camera id

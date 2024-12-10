@@ -17,6 +17,7 @@
 // #define LOG_NDEBUG 0
 #define LOG_TAG "GCH_ResultDispatcher"
 #define ATRACE_TAG ATRACE_TAG_CAMERA
+
 #include "result_dispatcher.h"
 
 #include <inttypes.h>
@@ -64,6 +65,12 @@ ResultDispatcher::ResultDispatcher(
       process_batch_capture_result_(process_batch_capture_result),
       notify_(notify) {
   ATRACE_CALL();
+  pending_shutters_ = DispatchQueue<PendingShutter>(name_, "shutter");
+  pending_early_metadata_ =
+      DispatchQueue<PendingResultMetadata>(name_, "early result metadata");
+  pending_final_metadata_ =
+      DispatchQueue<PendingResultMetadata>(name_, "final result metadata");
+
   notify_callback_thread_ =
       std::thread([this] { this->NotifyCallbackThreadLoop(); });
 
@@ -118,23 +125,33 @@ status_t ResultDispatcher::AddPendingRequestLocked(
     const CaptureRequest& pending_request) {
   ATRACE_CALL();
   uint32_t frame_number = pending_request.frame_number;
+  const RequestType request_type = pending_request.input_buffers.empty()
+                                       ? RequestType::kNormal
+                                       : RequestType::kReprocess;
 
-  status_t res = AddPendingShutterLocked(frame_number);
+  status_t res = pending_shutters_.AddRequest(frame_number, request_type);
   if (res != OK) {
     ALOGE("[%s] %s: Adding pending shutter for frame %u failed: %s(%d)",
           name_.c_str(), __FUNCTION__, frame_number, strerror(-res), res);
     return res;
   }
 
-  res = AddPendingFinalResultMetadataLocked(frame_number);
+  res = pending_early_metadata_.AddRequest(frame_number, request_type);
   if (res != OK) {
-    ALOGE("[%s] %s: Adding pending result metadata for frame %u failed: %s(%d)",
+    ALOGE("[%s] %s: Adding pending early metadata for frame %u failed: %s(%d)",
+          name_.c_str(), __FUNCTION__, frame_number, strerror(-res), res);
+    return res;
+  }
+
+  res = pending_final_metadata_.AddRequest(frame_number, request_type);
+  if (res != OK) {
+    ALOGE("[%s] %s: Adding pending final metadata for frame %u failed: %s(%d)",
           name_.c_str(), __FUNCTION__, frame_number, strerror(-res), res);
     return res;
   }
 
   for (auto& buffer : pending_request.input_buffers) {
-    res = AddPendingBufferLocked(frame_number, buffer, /*is_input=*/true);
+    res = AddPendingBufferLocked(frame_number, buffer, request_type);
     if (res != OK) {
       ALOGE("[%s] %s: Adding pending input buffer for frame %u failed: %s(%d)",
             name_.c_str(), __FUNCTION__, frame_number, strerror(-res), res);
@@ -143,7 +160,7 @@ status_t ResultDispatcher::AddPendingRequestLocked(
   }
 
   for (auto& buffer : pending_request.output_buffers) {
-    res = AddPendingBufferLocked(frame_number, buffer, /*is_input=*/false);
+    res = AddPendingBufferLocked(frame_number, buffer, request_type);
     if (res != OK) {
       ALOGE("[%s] %s: Adding pending output buffer for frame %u failed: %s(%d)",
             name_.c_str(), __FUNCTION__, frame_number, strerror(-res), res);
@@ -154,63 +171,28 @@ status_t ResultDispatcher::AddPendingRequestLocked(
   return OK;
 }
 
-status_t ResultDispatcher::AddPendingShutterLocked(uint32_t frame_number) {
-  ATRACE_CALL();
-  if (pending_shutters_.find(frame_number) != pending_shutters_.end()) {
-    ALOGE("[%s] %s: Pending shutter for frame %u already exists.",
-          name_.c_str(), __FUNCTION__, frame_number);
-    return ALREADY_EXISTS;
-  }
-
-  pending_shutters_[frame_number] = PendingShutter();
-  return OK;
-}
-
-status_t ResultDispatcher::AddPendingFinalResultMetadataLocked(
-    uint32_t frame_number) {
-  ATRACE_CALL();
-  if (pending_final_metadata_.find(frame_number) !=
-      pending_final_metadata_.end()) {
-    ALOGE("[%s] %s: Pending final result metadata for frame %u already exists.",
-          name_.c_str(), __FUNCTION__, frame_number);
-    return ALREADY_EXISTS;
-  }
-
-  pending_final_metadata_[frame_number] = PendingFinalResultMetadata();
-  return OK;
-}
-
 status_t ResultDispatcher::AddPendingBufferLocked(uint32_t frame_number,
                                                   const StreamBuffer& buffer,
-                                                  bool is_input) {
+                                                  RequestType request_type) {
   ATRACE_CALL();
   StreamKey stream_key = CreateStreamKey(buffer.stream_id);
-  if (stream_pending_buffers_map_.find(stream_key) ==
-      stream_pending_buffers_map_.end()) {
-    stream_pending_buffers_map_[stream_key] =
-        std::map<uint32_t, PendingBuffer>();
+  if (!stream_pending_buffers_map_.contains(stream_key)) {
+    stream_pending_buffers_map_[stream_key] = DispatchQueue<PendingBuffer>(
+        name_, "buffer of stream " + DumpStreamKey(stream_key));
   }
 
-  if (stream_pending_buffers_map_[stream_key].find(frame_number) !=
-      stream_pending_buffers_map_[stream_key].end()) {
-    ALOGE("[%s] %s: Pending buffer of stream %s for frame %u already exists.",
-          name_.c_str(), __FUNCTION__, DumpStreamKey(stream_key).c_str(),
-          frame_number);
-    return ALREADY_EXISTS;
-  }
-
-  PendingBuffer pending_buffer = {.is_input = is_input};
-  stream_pending_buffers_map_[stream_key][frame_number] = pending_buffer;
-  return OK;
+  return stream_pending_buffers_map_[stream_key].AddRequest(frame_number,
+                                                            request_type);
 }
 
 void ResultDispatcher::RemovePendingRequestLocked(uint32_t frame_number) {
   ATRACE_CALL();
-  pending_shutters_.erase(frame_number);
-  pending_final_metadata_.erase(frame_number);
+  pending_shutters_.RemoveRequest(frame_number);
+  pending_early_metadata_.RemoveRequest(frame_number);
+  pending_final_metadata_.RemoveRequest(frame_number);
 
   for (auto& pending_buffers : stream_pending_buffers_map_) {
-    pending_buffers.second.erase(frame_number);
+    pending_buffers.second.RemoveRequest(frame_number);
   }
 }
 
@@ -231,7 +213,7 @@ status_t ResultDispatcher::AddResultImpl(std::unique_ptr<CaptureResult> result) 
   }
 
   for (auto& buffer : result->output_buffers) {
-    res = AddBuffer(frame_number, buffer);
+    res = AddBuffer(frame_number, buffer, /*is_input=*/false);
     if (res != OK) {
       ALOGE("[%s] %s: Adding an output buffer failed: %s (%d)", name_.c_str(),
             __FUNCTION__, strerror(-res), res);
@@ -240,7 +222,7 @@ status_t ResultDispatcher::AddResultImpl(std::unique_ptr<CaptureResult> result) 
   }
 
   for (auto& buffer : result->input_buffers) {
-    res = AddBuffer(frame_number, buffer);
+    res = AddBuffer(frame_number, buffer, /*is_input=*/true);
     if (res != OK) {
       ALOGE("[%s] %s: Adding an input buffer failed: %s (%d)", name_.c_str(),
             __FUNCTION__, strerror(-res), res);
@@ -264,9 +246,6 @@ status_t ResultDispatcher::AddResult(std::unique_ptr<CaptureResult> result) {
 
 status_t ResultDispatcher::AddBatchResult(
     std::vector<std::unique_ptr<CaptureResult>> results) {
-  // Send out the partial results immediately.
-  NotifyBatchPartialResultMetadata(results);
-
   std::optional<status_t> last_error;
   for (auto& result : results) {
     const status_t res = AddResultImpl(std::move(result));
@@ -286,27 +265,22 @@ status_t ResultDispatcher::AddShutter(uint32_t frame_number,
                                       int64_t timestamp_ns,
                                       int64_t readout_timestamp_ns) {
   ATRACE_CALL();
+
   {
     std::lock_guard<std::mutex> lock(result_lock_);
-
-    auto shutter_it = pending_shutters_.find(frame_number);
-    if (shutter_it == pending_shutters_.end()) {
-      ALOGE("[%s] %s: Cannot find the pending shutter for frame %u",
-            name_.c_str(), __FUNCTION__, frame_number);
-      return NAME_NOT_FOUND;
+    status_t res = pending_shutters_.AddResult(
+        frame_number, PendingShutter{
+                          .timestamp_ns = timestamp_ns,
+                          .readout_timestamp_ns = readout_timestamp_ns,
+                          .ready = true,
+                      });
+    if (res != OK) {
+      ALOGE(
+          "[%s] %s: Failed to add shutter for frame %u , New timestamp "
+          "%" PRId64,
+          name_.c_str(), __FUNCTION__, frame_number, timestamp_ns);
+      return res;
     }
-
-    if (shutter_it->second.ready) {
-      ALOGE("[%s] %s: Already received shutter (%" PRId64
-            ") for frame %u. New timestamp %" PRId64,
-            name_.c_str(), __FUNCTION__, shutter_it->second.timestamp_ns,
-            frame_number, timestamp_ns);
-      return ALREADY_EXISTS;
-    }
-
-    shutter_it->second.timestamp_ns = timestamp_ns;
-    shutter_it->second.readout_timestamp_ns = readout_timestamp_ns;
-    shutter_it->second.ready = true;
   }
   {
     std::unique_lock<std::mutex> lock(notify_callback_lock_);
@@ -324,12 +298,13 @@ status_t ResultDispatcher::AddError(const ErrorMessage& error) {
   if (error.error_code == ErrorCode::kErrorDevice ||
       error.error_code == ErrorCode::kErrorResult ||
       error.error_code == ErrorCode::kErrorRequest) {
-    pending_shutters_.erase(frame_number);
+    pending_shutters_.RemoveRequest(frame_number);
   }
   // No need to deliver the result metadata on a result metadata error
   if (error.error_code == ErrorCode::kErrorResult ||
       error.error_code == ErrorCode::kErrorRequest) {
-    pending_final_metadata_.erase(frame_number);
+    pending_early_metadata_.RemoveRequest(frame_number);
+    pending_final_metadata_.RemoveRequest(frame_number);
   }
 
   NotifyMessage message = {.type = MessageType::kError, .message.error = error};
@@ -353,31 +328,6 @@ std::unique_ptr<CaptureResult> ResultDispatcher::MakeResultMetadata(
   return result;
 }
 
-status_t ResultDispatcher::AddFinalResultMetadata(
-    uint32_t frame_number, std::unique_ptr<HalCameraMetadata> final_metadata,
-    std::vector<PhysicalCameraMetadata> physical_metadata) {
-  ATRACE_CALL();
-  std::lock_guard<std::mutex> lock(result_lock_);
-
-  auto metadata_it = pending_final_metadata_.find(frame_number);
-  if (metadata_it == pending_final_metadata_.end()) {
-    ALOGE("[%s] %s: Cannot find the pending result metadata for frame %u",
-          name_.c_str(), __FUNCTION__, frame_number);
-    return NAME_NOT_FOUND;
-  }
-
-  if (metadata_it->second.ready) {
-    ALOGE("[%s] %s: Already received final result metadata for frame %u.",
-          name_.c_str(), __FUNCTION__, frame_number);
-    return ALREADY_EXISTS;
-  }
-
-  metadata_it->second.metadata = std::move(final_metadata);
-  metadata_it->second.physical_metadata = std::move(physical_metadata);
-  metadata_it->second.ready = true;
-  return OK;
-}
-
 status_t ResultDispatcher::AddResultMetadata(
     uint32_t frame_number, std::unique_ptr<HalCameraMetadata> metadata,
     std::vector<PhysicalCameraMetadata> physical_metadata,
@@ -396,22 +346,21 @@ status_t ResultDispatcher::AddResultMetadata(
     return BAD_VALUE;
   }
 
-  if (partial_result < kPartialResultCount) {
-    // Send out partial results immediately.
-    std::vector<std::unique_ptr<CaptureResult>> results;
-    results.push_back(MakeResultMetadata(frame_number, std::move(metadata),
-                                         std::move(physical_metadata),
-                                         partial_result));
-    NotifyCaptureResults(std::move(results));
-    return OK;
-  }
-
-  return AddFinalResultMetadata(frame_number, std::move(metadata),
-                                std::move(physical_metadata));
+  std::lock_guard<std::mutex> lock(result_lock_);
+  DispatchQueue<PendingResultMetadata>& queue =
+      partial_result < kPartialResultCount ? pending_early_metadata_
+                                           : pending_final_metadata_;
+  return queue.AddResult(frame_number,
+                         PendingResultMetadata{
+                             .metadata = std::move(metadata),
+                             .physical_metadata = std::move(physical_metadata),
+                             .partial_result_count = partial_result,
+                             .ready = true,
+                         });
 }
 
-status_t ResultDispatcher::AddBuffer(uint32_t frame_number,
-                                     StreamBuffer buffer) {
+status_t ResultDispatcher::AddBuffer(uint32_t frame_number, StreamBuffer buffer,
+                                     bool is_input) {
   ATRACE_CALL();
   std::lock_guard<std::mutex> lock(result_lock_);
 
@@ -423,25 +372,12 @@ status_t ResultDispatcher::AddBuffer(uint32_t frame_number,
     return NAME_NOT_FOUND;
   }
 
-  auto pending_buffer_it = pending_buffers_it->second.find(frame_number);
-  if (pending_buffer_it == pending_buffers_it->second.end()) {
-    ALOGE("[%s] %s: Cannot find the pending buffer for stream %s for frame %u",
-          name_.c_str(), __FUNCTION__, DumpStreamKey(stream_key).c_str(),
-          frame_number);
-    return NAME_NOT_FOUND;
-  }
-
-  if (pending_buffer_it->second.ready) {
-    ALOGE("[%s] %s: Already received a buffer for stream %s for frame %u",
-          name_.c_str(), __FUNCTION__, DumpStreamKey(stream_key).c_str(),
-          frame_number);
-    return ALREADY_EXISTS;
-  }
-
-  pending_buffer_it->second.buffer = std::move(buffer);
-  pending_buffer_it->second.ready = true;
-
-  return OK;
+  return pending_buffers_it->second.AddResult(frame_number,
+                                              PendingBuffer{
+                                                  .buffer = buffer,
+                                                  .is_input = is_input,
+                                                  .ready = true,
+                                              });
 }
 
 void ResultDispatcher::NotifyCallbackThreadLoop() {
@@ -453,7 +389,7 @@ void ResultDispatcher::NotifyCallbackThreadLoop() {
 
   while (1) {
     NotifyShutters();
-    NotifyFinalResultMetadata();
+    NotifyResultMetadata();
     NotifyBuffers();
 
     std::unique_lock<std::mutex> lock(notify_callback_lock_);
@@ -475,22 +411,12 @@ void ResultDispatcher::NotifyCallbackThreadLoop() {
 
 void ResultDispatcher::PrintTimeoutMessages() {
   std::lock_guard<std::mutex> lock(result_lock_);
-  for (auto& [frame_number, shutter] : pending_shutters_) {
-    ALOGW("[%s] %s: pending shutter for frame %u ready %d", name_.c_str(),
-          __FUNCTION__, frame_number, shutter.ready);
-  }
-
-  for (auto& [frame_number, final_metadata] : pending_final_metadata_) {
-    ALOGW("[%s] %s: pending final result metadaata for frame %u ready %d",
-          name_.c_str(), __FUNCTION__, frame_number, final_metadata.ready);
-  }
+  pending_shutters_.PrintTimeoutMessages();
+  pending_early_metadata_.PrintTimeoutMessages();
+  pending_final_metadata_.PrintTimeoutMessages();
 
   for (auto& [stream_key, pending_buffers] : stream_pending_buffers_map_) {
-    for (auto& [frame_number, pending_buffer] : pending_buffers) {
-      ALOGW("[%s] %s: pending buffer of stream %s for frame %u ready %d",
-            name_.c_str(), __FUNCTION__, DumpStreamKey(stream_key).c_str(),
-            frame_number, pending_buffer.ready);
-    }
+    pending_buffers.PrintTimeoutMessages();
   }
 }
 
@@ -525,37 +451,23 @@ std::string ResultDispatcher::DumpStreamKey(const StreamKey& stream_key) const {
   }
 }
 
-status_t ResultDispatcher::GetReadyShutterMessage(NotifyMessage* message) {
-  ATRACE_CALL();
-  if (message == nullptr) {
-    ALOGE("[%s] %s: message is nullptr", name_.c_str(), __FUNCTION__);
-    return BAD_VALUE;
-  }
-
-  auto shutter_it = pending_shutters_.begin();
-  if (shutter_it == pending_shutters_.end() || !shutter_it->second.ready) {
-    // The first pending shutter is not ready.
-    return NAME_NOT_FOUND;
-  }
-
-  message->type = MessageType::kShutter;
-  message->message.shutter.frame_number = shutter_it->first;
-  message->message.shutter.timestamp_ns = shutter_it->second.timestamp_ns;
-  message->message.shutter.readout_timestamp_ns =
-      shutter_it->second.readout_timestamp_ns;
-  pending_shutters_.erase(shutter_it);
-
-  return OK;
-}
-
 void ResultDispatcher::NotifyShutters() {
   ATRACE_CALL();
   NotifyMessage message = {};
+  // TODO: b/347771898 - Update to not depend on running faster than data is
+  // ready
   while (true) {
+    uint32_t frame_number = 0;
+    PendingShutter pending_shutter;
     std::lock_guard<std::mutex> lock(result_lock_);
-    if (GetReadyShutterMessage(&message) != OK) {
+    if (pending_shutters_.GetReadyData(frame_number, pending_shutter) != OK) {
       break;
     }
+    message.type = MessageType::kShutter;
+    message.message.shutter.frame_number = frame_number;
+    message.message.shutter.timestamp_ns = pending_shutter.timestamp_ns;
+    message.message.shutter.readout_timestamp_ns =
+        pending_shutter.readout_timestamp_ns;
     ALOGV("[%s] %s: Notify shutter for frame %u timestamp %" PRIu64
           " readout_timestamp %" PRIu64,
           name_.c_str(), __FUNCTION__, message.message.shutter.frame_number,
@@ -578,70 +490,45 @@ void ResultDispatcher::NotifyCaptureResults(
   }
 }
 
-status_t ResultDispatcher::GetReadyFinalMetadata(
-    uint32_t* frame_number, std::unique_ptr<HalCameraMetadata>* final_metadata,
-    std::vector<PhysicalCameraMetadata>* physical_metadata) {
+void ResultDispatcher::NotifyResultMetadata() {
   ATRACE_CALL();
-  if (final_metadata == nullptr || frame_number == nullptr) {
-    ALOGE("[%s] %s: final_metadata (%p) or frame_number (%p) is nullptr",
-          name_.c_str(), __FUNCTION__, final_metadata, frame_number);
-    return BAD_VALUE;
-  }
+  uint32_t frame_number = 0;
+  std::vector<std::unique_ptr<CaptureResult>> early_results;
+  std::vector<std::unique_ptr<CaptureResult>> final_results;
+  PendingResultMetadata early_result_metadata;
+  PendingResultMetadata final_result_metadata;
+  // TODO: b/347771898 - Assess if notify can hold the lock for less time
+  {
+    std::lock_guard<std::mutex> lock(result_lock_);
+    while (pending_early_metadata_.GetReadyData(frame_number,
+                                                early_result_metadata) == OK) {
+      ALOGV("[%s] %s: Notify early metadata for frame %u", name_.c_str(),
+            __FUNCTION__, frame_number);
+      early_results.push_back(MakeResultMetadata(
+          frame_number, std::move(early_result_metadata.metadata),
+          std::move(early_result_metadata.physical_metadata),
+          early_result_metadata.partial_result_count));
+    }
 
-  std::lock_guard<std::mutex> lock(result_lock_);
+    while (pending_final_metadata_.GetReadyData(frame_number,
+                                                final_result_metadata) == OK) {
+      ALOGV("[%s] %s: Notify final metadata for frame %u", name_.c_str(),
+            __FUNCTION__, frame_number);
+      // Removes the pending early metadata if it exists, in case the HAL only
+      // sent the final metadata
+      pending_early_metadata_.RemoveRequest(frame_number);
 
-  auto final_metadata_it = pending_final_metadata_.begin();
-  if (final_metadata_it == pending_final_metadata_.end() ||
-      !final_metadata_it->second.ready) {
-    // The first pending final metadata is not ready.
-    return NAME_NOT_FOUND;
-  }
-
-  *frame_number = final_metadata_it->first;
-  *final_metadata = std::move(final_metadata_it->second.metadata);
-  *physical_metadata = std::move(final_metadata_it->second.physical_metadata);
-  pending_final_metadata_.erase(final_metadata_it);
-
-  return OK;
-}
-
-void ResultDispatcher::NotifyBatchPartialResultMetadata(
-    std::vector<std::unique_ptr<CaptureResult>>& results) {
-  ATRACE_CALL();
-  std::vector<std::unique_ptr<CaptureResult>> metadata_results;
-  for (auto& result : results) {
-    if (result->result_metadata != nullptr &&
-        result->partial_result < kPartialResultCount) {
-      ALOGV("[%s] %s: Notify partial metadata for frame %u, result count %u",
-            name_.c_str(), __FUNCTION__, result->frame_number,
-            result->partial_result);
-      metadata_results.push_back(MakeResultMetadata(
-          result->frame_number, std::move(result->result_metadata),
-          std::move(result->physical_metadata), result->partial_result));
+      final_results.push_back(MakeResultMetadata(
+          frame_number, std::move(final_result_metadata.metadata),
+          std::move(final_result_metadata.physical_metadata),
+          final_result_metadata.partial_result_count));
     }
   }
-  if (!metadata_results.empty()) {
-    NotifyCaptureResults(std::move(metadata_results));
+  if (!early_results.empty()) {
+    NotifyCaptureResults(std::move(early_results));
   }
-}
-
-void ResultDispatcher::NotifyFinalResultMetadata() {
-  ATRACE_CALL();
-  uint32_t frame_number;
-  std::unique_ptr<HalCameraMetadata> final_metadata;
-  std::vector<PhysicalCameraMetadata> physical_metadata;
-  std::vector<std::unique_ptr<CaptureResult>> results;
-
-  while (GetReadyFinalMetadata(&frame_number, &final_metadata,
-                               &physical_metadata) == OK) {
-    ALOGV("[%s] %s: Notify final metadata for frame %u", name_.c_str(),
-          __FUNCTION__, frame_number);
-    results.push_back(
-        MakeResultMetadata(frame_number, std::move(final_metadata),
-                           std::move(physical_metadata), kPartialResultCount));
-  }
-  if (!results.empty()) {
-    NotifyCaptureResults(std::move(results));
+  if (!final_results.empty()) {
+    NotifyCaptureResults(std::move(final_results));
   }
 }
 
@@ -657,23 +544,18 @@ status_t ResultDispatcher::GetReadyBufferResult(
   *result = nullptr;
 
   for (auto& pending_buffers : stream_pending_buffers_map_) {
-    auto buffer_it = pending_buffers.second.begin();
-    while (buffer_it != pending_buffers.second.end()) {
-      if (!buffer_it->second.ready) {
-        // No more buffer ready.
-        break;
-      }
+    uint32_t frame_number = 0;
+    PendingBuffer buffer_data;
+    if (pending_buffers.second.GetReadyData(frame_number, buffer_data) == OK) {
+      std::unique_ptr<CaptureResult> buffer_result =
+          std::make_unique<CaptureResult>(CaptureResult({}));
 
-      auto buffer_result = std::make_unique<CaptureResult>(CaptureResult({}));
-
-      buffer_result->frame_number = buffer_it->first;
-      if (buffer_it->second.is_input) {
-        buffer_result->input_buffers.push_back(buffer_it->second.buffer);
+      buffer_result->frame_number = frame_number;
+      if (buffer_data.is_input) {
+        buffer_result->input_buffers.push_back(buffer_data.buffer);
       } else {
-        buffer_result->output_buffers.push_back(buffer_it->second.buffer);
+        buffer_result->output_buffers.push_back(buffer_data.buffer);
       }
-
-      pending_buffers.second.erase(buffer_it);
       *result = std::move(buffer_result);
       return OK;
     }
@@ -687,6 +569,8 @@ void ResultDispatcher::NotifyBuffers() {
   std::vector<std::unique_ptr<CaptureResult>> results;
   std::unique_ptr<CaptureResult> result;
 
+  // TODO: b/347771898 - Update to not depend on running faster than data is
+  // ready
   while (GetReadyBufferResult(&result) == OK) {
     if (result == nullptr) {
       ALOGE("[%s] %s: result is nullptr", name_.c_str(), __FUNCTION__);
@@ -700,6 +584,102 @@ void ResultDispatcher::NotifyBuffers() {
     NotifyCaptureResults(std::move(results));
   }
 }
+
+template <typename FrameData>
+ResultDispatcher::DispatchQueue<FrameData>::DispatchQueue(
+    std::string_view dispatcher_name, std::string_view data_name)
+    : dispatcher_name_(dispatcher_name), data_name_(data_name) {
+}
+
+template <typename FrameData>
+status_t ResultDispatcher::DispatchQueue<FrameData>::AddRequest(
+    uint32_t frame_number, RequestType request_type) {
+  if (normal_request_map_.contains(frame_number) ||
+      reprocess_request_map_.contains(frame_number)) {
+    ALOGE("[%s] %s: Pending %s for frame %u already exists.",
+          std::string(dispatcher_name_).c_str(), __FUNCTION__,
+          data_name_.c_str(), frame_number);
+    return ALREADY_EXISTS;
+  }
+  if (request_type == RequestType::kNormal) {
+    normal_request_map_[frame_number] = FrameData();
+  } else {
+    reprocess_request_map_[frame_number] = FrameData();
+  }
+  return OK;
+}
+
+template <typename FrameData>
+void ResultDispatcher::DispatchQueue<FrameData>::RemoveRequest(
+    uint32_t frame_number) {
+  normal_request_map_.erase(frame_number);
+  reprocess_request_map_.erase(frame_number);
+}
+
+template <typename FrameData>
+status_t ResultDispatcher::DispatchQueue<FrameData>::AddResult(
+    uint32_t frame_number, FrameData result) {
+  auto it = normal_request_map_.find(frame_number);
+  if (it == normal_request_map_.end()) {
+    it = reprocess_request_map_.find(frame_number);
+    if (it == reprocess_request_map_.end()) {
+      ALOGE("[%s] %s: Cannot find the pending %s for frame %u",
+            std::string(dispatcher_name_).c_str(), __FUNCTION__,
+            data_name_.c_str(), frame_number);
+      return NAME_NOT_FOUND;
+    }
+  }
+
+  if (it->second.ready) {
+    ALOGE("[%s] %s: Already received %s for frame %u",
+          std::string(dispatcher_name_).c_str(), __FUNCTION__,
+          data_name_.c_str(), frame_number);
+    return ALREADY_EXISTS;
+  }
+
+  it->second = std::move(result);
+  return OK;
+}
+
+template <typename FrameData>
+status_t ResultDispatcher::DispatchQueue<FrameData>::GetReadyData(
+    uint32_t& frame_number, FrameData& ready_data) {
+  auto it = normal_request_map_.begin();
+  if (it != normal_request_map_.end() && it->second.ready) {
+    frame_number = it->first;
+    ready_data = std::move(it->second);
+    normal_request_map_.erase(it);
+    return OK;
+  }
+
+  it = reprocess_request_map_.begin();
+  if (it != reprocess_request_map_.end() && it->second.ready) {
+    frame_number = it->first;
+    ready_data = std::move(it->second);
+    reprocess_request_map_.erase(it);
+    return OK;
+  }
+  // The first pending data is not ready
+  return NAME_NOT_FOUND;
+}
+
+template <typename FrameData>
+void ResultDispatcher::DispatchQueue<FrameData>::PrintTimeoutMessages() {
+  for (auto& [frame_number, pending_data] : normal_request_map_) {
+    ALOGW("[%s] %s: pending %s for frame %u ready %d",
+          std::string(dispatcher_name_).c_str(), __FUNCTION__,
+          data_name_.c_str(), frame_number, pending_data.ready);
+  }
+  for (auto& [frame_number, pending_data] : reprocess_request_map_) {
+    ALOGW("[%s] %s: pending %s for frame %u ready %d",
+          std::string(dispatcher_name_).c_str(), __FUNCTION__,
+          data_name_.c_str(), frame_number, pending_data.ready);
+  }
+}
+template class ResultDispatcher::DispatchQueue<ResultDispatcher::PendingShutter>;
+template class ResultDispatcher::DispatchQueue<ResultDispatcher::PendingBuffer>;
+template class ResultDispatcher::DispatchQueue<
+    ResultDispatcher::PendingResultMetadata>;
 
 }  // namespace google_camera_hal
 }  // namespace android

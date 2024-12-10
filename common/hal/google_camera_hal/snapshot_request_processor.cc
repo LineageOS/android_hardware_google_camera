@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
+// #define LOG_NDEBUG 0
 #include "system/graphics-base-v1.0.h"
 #define LOG_TAG "GCH_SnapshotRequestProcessor"
 #define ATRACE_TAG ATRACE_TAG_CAMERA
@@ -215,6 +215,15 @@ status_t SnapshotRequestProcessor::Flush() {
   }
 
   return process_block_->Flush();
+}
+
+void SnapshotRequestProcessor::RepeatingRequestEnd(
+    int32_t frame_number, const std::vector<int32_t>& stream_ids) {
+  ATRACE_CALL();
+  std::lock_guard<std::mutex> lock(process_block_lock_);
+  if (process_block_ != nullptr) {
+    process_block_->RepeatingRequestEnd(frame_number, stream_ids);
+  }
 }
 
 }  // namespace google_camera_hal

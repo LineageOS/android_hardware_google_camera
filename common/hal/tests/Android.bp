@@ -55,7 +55,6 @@ cc_library {
         "zsl_buffer_manager_tests.cc",
     ],
     shared_libs: [
-        "android.hardware.camera.provider@2.4",
         "lib_profiler",
         "libcamera_metadata",
         "libcutils",
@@ -67,6 +66,7 @@ cc_library {
         "libutils",
     ],
     static_libs: [
+        "android.hardware.camera.provider@2.4",
         "libgmock",
         "libgtest",
     ],
@@ -92,7 +92,6 @@ cc_test {
         "lib_profiler",
         "libgooglecamerahal",
         "libgooglecamerahalutils",
-        "android.hardware.camera.provider@2.4",
         "libcamera_metadata",
         "libcutils",
         "libhardware",
@@ -104,6 +103,7 @@ cc_test {
         "libgoogle_camera_hal_tests",
     ],
     static_libs: [
+        "android.hardware.camera.provider@2.4",
         "libgmock",
         "libgtest",
     ],

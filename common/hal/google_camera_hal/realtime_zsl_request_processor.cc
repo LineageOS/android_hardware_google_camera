@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
+// #define LOG_NDEBUG 0
 #define LOG_TAG "GCH_RealtimeZslRequestProcessor"
 #define ATRACE_TAG ATRACE_TAG_CAMERA
 #include "realtime_zsl_request_processor.h"
@@ -126,9 +126,13 @@ std::unique_ptr<RealtimeZslRequestProcessor> RealtimeZslRequestProcessor::Create
     ALOGE("%s: device_session_hwl is nullptr", __FUNCTION__);
     return nullptr;
   }
+  if (pixel_format != android_pixel_format_t::HAL_PIXEL_FORMAT_YCBCR_420_888) {
+    ALOGE("%s: only YCBCR_420_888 is supported for YUV ZSL", __FUNCTION__);
+    return nullptr;
+  }
 
   auto request_processor = std::unique_ptr<RealtimeZslRequestProcessor>(
-      new RealtimeZslRequestProcessor(pixel_format, device_session_hwl));
+      new RealtimeZslRequestProcessor(device_session_hwl));
   if (request_processor == nullptr) {
     ALOGE("%s: Creating RealtimeZslRequestProcessor failed.", __FUNCTION__);
     return nullptr;
@@ -167,12 +171,6 @@ status_t RealtimeZslRequestProcessor::Initialize(
           res);
     return res;
   }
-  if (pixel_format_ == android_pixel_format_t::HAL_PIXEL_FORMAT_RAW10) {
-    res = characteristics->Get(VendorTagIds::kHdrUsageMode, &entry);
-    if (res == OK) {
-      hdr_mode_ = static_cast<HdrMode>(entry.data.u8[0]);
-    }
-  }
 
   return OK;
 }
@@ -193,21 +191,19 @@ status_t RealtimeZslRequestProcessor::ConfigureStreams(
 
   // For YUV ZSL, we will use the JPEG size for ZSL buffer size. We already
   // checked the size is supported in capture session.
-  if (pixel_format_ == android_pixel_format_t::HAL_PIXEL_FORMAT_YCBCR_420_888) {
-    for (const auto& stream : stream_config.streams) {
-      if (utils::IsSoftwareDenoiseEligibleSnapshotStream(stream)) {
-        if (SelectWidthAndHeight(stream.width, stream.height,
-                                 *device_session_hwl_, active_array_width_,
-                                 active_array_height_) != OK) {
-          ALOGE("%s: failed to select ZSL YUV buffer width and height",
-                __FUNCTION__);
-          return BAD_VALUE;
-        }
-        ALOGI("%s, Snapshot size is (%d x %d), selected size is (%d x %d)",
-              __FUNCTION__, stream.width, stream.height, active_array_width_,
-              active_array_height_);
-        break;
+  for (const auto& stream : stream_config.streams) {
+    if (utils::IsSoftwareDenoiseEligibleSnapshotStream(stream)) {
+      if (SelectWidthAndHeight(stream.width, stream.height,
+                               *device_session_hwl_, active_array_width_,
+                               active_array_height_) != OK) {
+        ALOGE("%s: failed to select ZSL YUV buffer width and height",
+              __FUNCTION__);
+        return BAD_VALUE;
       }
+      ALOGI("%s, Snapshot size is (%d x %d), selected size is (%d x %d)",
+            __FUNCTION__, stream.width, stream.height, active_array_width_,
+            active_array_height_);
+      break;
     }
   }
 
@@ -216,7 +212,7 @@ status_t RealtimeZslRequestProcessor::ConfigureStreams(
   stream_to_add.stream_type = StreamType::kOutput;
   stream_to_add.width = active_array_width_;
   stream_to_add.height = active_array_height_;
-  stream_to_add.format = pixel_format_;
+  stream_to_add.format = HAL_PIXEL_FORMAT_YCBCR_420_888;
   stream_to_add.usage = 0;
   stream_to_add.rotation = StreamRotation::kRotation0;
   stream_to_add.data_space = HAL_DATASPACE_ARBITRARY;
@@ -224,8 +220,7 @@ status_t RealtimeZslRequestProcessor::ConfigureStreams(
   // we will add the new stream as physical stream. As we support physical
   // streams only or logical streams only combination. We can check the stream
   // type of the first stream in the list.
-  if (pixel_format_ == android_pixel_format_t::HAL_PIXEL_FORMAT_YCBCR_420_888 &&
-      stream_config.streams[0].is_physical_camera_stream) {
+  if (stream_config.streams[0].is_physical_camera_stream) {
     stream_to_add.is_physical_camera_stream = true;
     stream_to_add.physical_camera_id =
         stream_config.streams[0].physical_camera_id;
@@ -282,20 +277,6 @@ status_t RealtimeZslRequestProcessor::ProcessRequest(
     return NO_INIT;
   }
 
-  if (is_hdrplus_zsl_enabled_ && request.settings != nullptr) {
-    camera_metadata_ro_entry entry = {};
-    status_t res =
-        request.settings->Get(VendorTagIds::kThermalThrottling, &entry);
-    if (res != OK || entry.count != 1) {
-      ALOGW("%s: Getting thermal throttling entry failed: %s(%d)", __FUNCTION__,
-            strerror(-res), res);
-    } else if (entry.data.u8[0] == true) {
-      // Disable HDR+ ZSL once thermal throttles.
-      is_hdrplus_zsl_enabled_ = false;
-      ALOGI("%s: HDR+ ZSL disabled due to thermal throttling", __FUNCTION__);
-    }
-  }
-
   // Update if preview intent has been requested.
   camera_metadata_ro_entry entry;
   if (!preview_intent_seen_ && request.settings != nullptr &&
@@ -324,44 +305,21 @@ status_t RealtimeZslRequestProcessor::ProcessRequest(
         HalCameraMetadata::Clone(physical_metadata.get());
   }
 
-  if (is_hdrplus_zsl_enabled_ ||
-      pixel_format_ == android_pixel_format_t::HAL_PIXEL_FORMAT_YCBCR_420_888) {
-    // Get one bffer from internal stream manager
-    StreamBuffer buffer = {};
-    status_t result;
-    if (preview_intent_seen_) {
-      result = internal_stream_manager_->GetStreamBuffer(stream_id_, &buffer);
-      if (result != OK) {
-        ALOGE("%s: frame:%d GetStreamBuffer failed.", __FUNCTION__,
-              request.frame_number);
-        return UNKNOWN_ERROR;
-      }
+  // Get one buffer from internal stream manager
+  StreamBuffer buffer = {};
+  status_t result;
+  if (preview_intent_seen_) {
+    result = internal_stream_manager_->GetStreamBuffer(stream_id_, &buffer);
+    if (result != OK) {
+      ALOGE("%s: frame:%d GetStreamBuffer failed.", __FUNCTION__,
+            request.frame_number);
+      return UNKNOWN_ERROR;
     }
+  }
 
-    // Add output to capture request
-    if (preview_intent_seen_) {
-      block_request.output_buffers.push_back(buffer);
-    }
-
-    if (block_request.settings != nullptr && is_hdrplus_zsl_enabled_) {
-      bool enable_hybrid_ae =
-          (hdr_mode_ == HdrMode::kNonHdrplusMode ? false : true);
-      result = hal_utils::ModifyRealtimeRequestForHdrplus(
-          block_request.settings.get(), enable_hybrid_ae);
-      if (result != OK) {
-        ALOGE("%s: ModifyRealtimeRequestForHdrplus (%d) fail", __FUNCTION__,
-              request.frame_number);
-        return UNKNOWN_ERROR;
-      }
-
-      if (hdr_mode_ != HdrMode::kHdrplusMode) {
-        uint8_t processing_mode =
-            static_cast<uint8_t>(ProcessingMode::kIntermediateProcessing);
-        block_request.settings->Set(VendorTagIds::kProcessingMode,
-                                    &processing_mode,
-                                    /*data_count=*/1);
-      }
-    }
+  // Add output to capture request
+  if (preview_intent_seen_) {
+    block_request.output_buffers.push_back(buffer);
   }
 
   std::vector<ProcessBlockRequest> block_requests(1);
@@ -377,6 +335,15 @@ status_t RealtimeZslRequestProcessor::Flush() {
   }
 
   return process_block_->Flush();
+}
+
+void RealtimeZslRequestProcessor::RepeatingRequestEnd(
+    int32_t frame_number, const std::vector<int32_t>& stream_ids) {
+  ATRACE_CALL();
+  std::shared_lock lock(process_block_lock_);
+  if (process_block_ != nullptr) {
+    process_block_->RepeatingRequestEnd(frame_number, stream_ids);
+  }
 }
 
 }  // namespace google_camera_hal

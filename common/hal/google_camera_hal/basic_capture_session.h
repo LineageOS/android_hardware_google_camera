@@ -17,6 +17,8 @@
 #ifndef HARDWARE_GOOGLE_CAMERA_HAL_GOOGLE_CAMERA_HAL_BASIC_CAPTURE_SESSION_H_
 #define HARDWARE_GOOGLE_CAMERA_HAL_GOOGLE_CAMERA_HAL_BASIC_CAPTURE_SESSION_H_
 
+#include <vector>
+
 #include "camera_buffer_allocator_hwl.h"
 #include "camera_device_session_hwl.h"
 #include "capture_session.h"
@@ -70,6 +72,9 @@ class BasicCaptureSession : public CaptureSession {
 
   status_t Flush() override;
   // Override functions in CaptureSession end.
+
+  void RepeatingRequestEnd(int32_t frame_number,
+                           const std::vector<int32_t>& stream_ids) override;
 
  protected:
   BasicCaptureSession() = default;

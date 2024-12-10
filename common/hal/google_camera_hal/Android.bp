@@ -38,6 +38,22 @@ gch_hal_cc_defaults {
     },
 }
 
+aconfig_declarations {
+    name: "libgooglecamerahal_flags",
+    package: "libgooglecamerahal.flags",
+    container: "vendor",
+    srcs: ["libgooglecamerahal_flags.aconfig"],
+}
+
+cc_aconfig_library {
+    name: "libgooglecamerahal_flags_cc_lib",
+    aconfig_declarations: "libgooglecamerahal_flags",
+    defaults: ["google_camera_hal_defaults"],
+    host_supported: true,
+    owner: "google",
+    vendor: true,
+}
+
 cc_library_shared {
     name: "libgooglecamerahal",
     defaults: [
@@ -60,20 +76,10 @@ cc_library_shared {
         "camera_provider.cc",
         "capture_session_utils.cc",
         "capture_session_wrapper_process_block.cc",
-        "depth_process_block.cc",
-        "dual_ir_capture_session.cc",
-        "dual_ir_depth_result_processor.cc",
-        "dual_ir_request_processor.cc",
-        "dual_ir_result_request_processor.cc",
-        "hdrplus_capture_session.cc",
         "pending_requests_tracker.cc",
         "realtime_zsl_request_processor.cc",
         "realtime_zsl_result_processor.cc",
         "realtime_zsl_result_request_processor.cc",
-        "rgbird_capture_session.cc",
-        "rgbird_depth_result_processor.cc",
-        "rgbird_result_request_processor.cc",
-        "rgbird_rt_request_processor.cc",
         "snapshot_request_processor.cc",
         "snapshot_result_processor.cc",
         "vendor_tags.cc",
@@ -84,6 +90,7 @@ cc_library_shared {
         "libbase",
         "libcamera_metadata",
         "libcutils",
+        "libgooglecamerahal_flags_cc_lib",
         "libgooglecamerahalutils",
         "libhidlbase",
         "liblog",
@@ -93,7 +100,6 @@ cc_library_shared {
         "libsync",
     ],
     header_libs: [
-        "lib_depth_generator_headers",
         "libgooglecamerahal_headers",
     ],
     // b/129863492, clang-tidy nondeterministic seg fault

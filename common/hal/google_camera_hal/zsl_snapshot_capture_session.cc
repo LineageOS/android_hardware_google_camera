@@ -27,6 +27,7 @@
 #include <utils/Trace.h>
 
 #include "hal_utils.h"
+#include "libgooglecamerahal_flags.h"
 #include "realtime_zsl_result_request_processor.h"
 #include "snapshot_request_processor.h"
 #include "snapshot_result_processor.h"
@@ -733,8 +734,12 @@ status_t ZslSnapshotCaptureSession::Initialize(
   res = characteristics->Get(VendorTagIds::kVideoSwDenoiseEnabled,
                              &video_sw_denoise_entry);
   if (res == OK && video_sw_denoise_entry.data.u8[0] == 1) {
-    video_sw_denoise_enabled_ = true;
-    ALOGI("%s: video sw denoise is enabled.", __FUNCTION__);
+    if (libgooglecamerahal::flags::zsl_video_denoise_in_hwl()) {
+      ALOGI("%s: video sw denoise is enabled in HWL", __FUNCTION__);
+    } else {
+      video_sw_denoise_enabled_ = true;
+      ALOGI("%s: video sw denoise is enabled in GCH", __FUNCTION__);
+    }
   } else {
     ALOGI("%s: video sw denoise is disabled.", __FUNCTION__);
   }
@@ -877,6 +882,15 @@ status_t ZslSnapshotCaptureSession::ProcessRequest(const CaptureRequest& request
 status_t ZslSnapshotCaptureSession::Flush() {
   ATRACE_CALL();
   return realtime_request_processor_->Flush();
+}
+
+void ZslSnapshotCaptureSession::RepeatingRequestEnd(
+    int32_t frame_number, const std::vector<int32_t>& stream_ids) {
+  ATRACE_CALL();
+  if (realtime_request_processor_ != nullptr) {
+    return realtime_request_processor_->RepeatingRequestEnd(frame_number,
+                                                            stream_ids);
+  }
 }
 
 void ZslSnapshotCaptureSession::ProcessCaptureResult(

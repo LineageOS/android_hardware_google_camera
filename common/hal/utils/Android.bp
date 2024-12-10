@@ -29,9 +29,6 @@ cc_library_shared {
         "gralloc_buffer_allocator.cc",
         "hal_camera_metadata.cc",
         "hal_utils.cc",
-        "hdrplus_process_block.cc",
-        "hdrplus_request_processor.cc",
-        "hdrplus_result_processor.cc",
         "hwl_buffer_allocator.cc",
         "internal_stream_manager.cc",
         "multicam_realtime_process_block.cc",
@@ -61,6 +58,6 @@ cc_library_shared {
     ],
     export_include_dirs: ["."],
     include_dirs: [
-        "system/media/private/camera/include"
+        "system/media/private/camera/include",
     ],
 }

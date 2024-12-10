@@ -37,10 +37,14 @@ std::unique_ptr<RealtimeZslResultProcessor> RealtimeZslResultProcessor::Create(
     ALOGE("%s: internal_stream_manager is nullptr.", __FUNCTION__);
     return nullptr;
   }
+  if (pixel_format != android_pixel_format_t::HAL_PIXEL_FORMAT_YCBCR_420_888) {
+    ALOGE("%s: only YCBCR_420_888 is supported for YUV ZSL", __FUNCTION__);
+    return nullptr;
+  }
 
-  auto result_processor = std::unique_ptr<RealtimeZslResultProcessor>(
-      new RealtimeZslResultProcessor(internal_stream_manager, stream_id,
-                                     pixel_format, partial_result_count));
+  auto result_processor =
+      std::unique_ptr<RealtimeZslResultProcessor>(new RealtimeZslResultProcessor(
+          internal_stream_manager, stream_id, partial_result_count));
   if (result_processor == nullptr) {
     ALOGE("%s: Creating RealtimeZslResultProcessor failed.", __FUNCTION__);
     return nullptr;
@@ -51,10 +55,9 @@ std::unique_ptr<RealtimeZslResultProcessor> RealtimeZslResultProcessor::Create(
 
 RealtimeZslResultProcessor::RealtimeZslResultProcessor(
     InternalStreamManager* internal_stream_manager, int32_t stream_id,
-    android_pixel_format_t pixel_format, uint32_t partial_result_count) {
+    uint32_t partial_result_count) {
   internal_stream_manager_ = internal_stream_manager;
   stream_id_ = stream_id;
-  pixel_format_ = pixel_format;
   partial_result_count_ = partial_result_count;
 }
 
@@ -64,88 +67,6 @@ void RealtimeZslResultProcessor::SetResultCallback(
   std::lock_guard<std::mutex> lock(callback_lock_);
   process_capture_result_ = process_capture_result;
   notify_ = notify;
-}
-
-void RealtimeZslResultProcessor::SaveLsForHdrplus(const CaptureRequest& request) {
-  if (request.settings != nullptr) {
-    uint8_t lens_shading_map_mode;
-    status_t res =
-        hal_utils::GetLensShadingMapMode(request, &lens_shading_map_mode);
-    if (res == OK) {
-      current_lens_shading_map_mode_ = lens_shading_map_mode;
-    }
-  }
-
-  {
-    std::lock_guard<std::mutex> lock(lens_shading_lock_);
-    requested_lens_shading_map_modes_.emplace(request.frame_number,
-                                              current_lens_shading_map_mode_);
-  }
-}
-
-status_t RealtimeZslResultProcessor::HandleLsResultForHdrplus(
-    uint32_t frameNumber, HalCameraMetadata* metadata) {
-  if (metadata == nullptr) {
-    ALOGE("%s: metadata is nullptr", __FUNCTION__);
-    return BAD_VALUE;
-  }
-  std::lock_guard<std::mutex> lock(lens_shading_lock_);
-  auto iter = requested_lens_shading_map_modes_.find(frameNumber);
-  if (iter == requested_lens_shading_map_modes_.end()) {
-    ALOGW("%s: can't find frame (%d)", __FUNCTION__, frameNumber);
-    return OK;
-  }
-
-  if (iter->second == ANDROID_STATISTICS_LENS_SHADING_MAP_MODE_OFF) {
-    status_t res = hal_utils::RemoveLsInfoFromResult(metadata);
-    if (res != OK) {
-      ALOGW("%s: RemoveLsInfoFromResult fail", __FUNCTION__);
-    }
-  }
-  requested_lens_shading_map_modes_.erase(iter);
-
-  return OK;
-}
-
-void RealtimeZslResultProcessor::SaveFdForHdrplus(const CaptureRequest& request) {
-  // Enable face detect mode for internal use
-  if (request.settings != nullptr) {
-    uint8_t fd_mode;
-    status_t res = hal_utils::GetFdMode(request, &fd_mode);
-    if (res == OK) {
-      current_face_detect_mode_ = fd_mode;
-    }
-  }
-
-  {
-    std::lock_guard<std::mutex> lock(face_detect_lock_);
-    requested_face_detect_modes_.emplace(request.frame_number,
-                                         current_face_detect_mode_);
-  }
-}
-
-status_t RealtimeZslResultProcessor::HandleFdResultForHdrplus(
-    uint32_t frameNumber, HalCameraMetadata* metadata) {
-  if (metadata == nullptr) {
-    ALOGE("%s: metadata is nullptr", __FUNCTION__);
-    return BAD_VALUE;
-  }
-  std::lock_guard<std::mutex> lock(face_detect_lock_);
-  auto iter = requested_face_detect_modes_.find(frameNumber);
-  if (iter == requested_face_detect_modes_.end()) {
-    ALOGW("%s: can't find frame (%d)", __FUNCTION__, frameNumber);
-    return OK;
-  }
-
-  if (iter->second == ANDROID_STATISTICS_FACE_DETECT_MODE_OFF) {
-    status_t res = hal_utils::RemoveFdInfoFromResult(metadata);
-    if (res != OK) {
-      ALOGW("%s: RestoreFdMetadataForHdrplus fail", __FUNCTION__);
-    }
-  }
-  requested_face_detect_modes_.erase(iter);
-
-  return OK;
 }
 
 status_t RealtimeZslResultProcessor::AddPendingRequests(
@@ -158,11 +79,6 @@ status_t RealtimeZslResultProcessor::AddPendingRequests(
                                                   remaining_session_request)) {
     ALOGE("%s: Some output buffers will not be completed.", __FUNCTION__);
     return BAD_VALUE;
-  }
-
-  if (pixel_format_ == HAL_PIXEL_FORMAT_RAW10) {
-    SaveFdForHdrplus(remaining_session_request);
-    SaveLsForHdrplus(remaining_session_request);
   }
 
   return OK;
@@ -183,8 +99,8 @@ void RealtimeZslResultProcessor::ProcessResult(ProcessBlockResult block_result) 
     return;
   }
 
-  // Return filled raw buffer to internal stream manager
-  // And remove raw buffer from result
+  // Return filled buffer to internal stream manager
+  // And remove buffer from result
   bool returned_output = false;
   status_t res;
   std::vector<StreamBuffer> modified_output_buffers;
@@ -224,28 +140,10 @@ void RealtimeZslResultProcessor::ProcessResult(ProcessBlockResult block_result) 
         ALOGW("%s: SetEnableZslMetadata (%d) fail", __FUNCTION__,
               result->frame_number);
       }
-
-      if (pixel_format_ == HAL_PIXEL_FORMAT_RAW10) {
-        res = HandleFdResultForHdrplus(result->frame_number,
-                                       result->result_metadata.get());
-        if (res != OK) {
-          ALOGE("%s: HandleFdResultForHdrplus(%d) fail", __FUNCTION__,
-                result->frame_number);
-          return;
-        }
-
-        res = HandleLsResultForHdrplus(result->frame_number,
-                                       result->result_metadata.get());
-        if (res != OK) {
-          ALOGE("%s: HandleLsResultForHdrplus(%d) fail", __FUNCTION__,
-                result->frame_number);
-          return;
-        }
-      }
     }
   }
 
-  // Don't send result to framework if only internal raw callback
+  // Don't send result to framework if only internal callback
   if (returned_output && result->result_metadata == nullptr &&
       result->output_buffers.size() == 0) {
     return;

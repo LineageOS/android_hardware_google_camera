@@ -92,7 +92,7 @@ class AidlProfilerImpl : public AidlProfiler {
     }
 
     if (int size = latency_profilers_.size(); size > 2) {
-      ALOGE("%s: Too many overlapping operations (have: %d). Will not profile.",
+      ALOGW("%s: Too many overlapping operations (have: %d). Will not profile.",
             __FUNCTION__, size);
       return nullptr;
     }
@@ -105,7 +105,7 @@ class AidlProfilerImpl : public AidlProfiler {
         return nullptr;
       }
     }
-    ALOGE("%s: Could not find an operation for incoming event: %s",
+    ALOGW("%s: Could not find an operation for incoming event: %s",
           __FUNCTION__, EventTypeToString(type).c_str());
     return nullptr;
   }
@@ -118,7 +118,7 @@ class AidlProfilerImpl : public AidlProfiler {
         return;
       }
     }
-    ALOGE("%s: Error: no profiler accepted First Frame Start", __FUNCTION__);
+    ALOGW("%s: Error: no profiler accepted First Frame Start", __FUNCTION__);
   }
 
   void FirstFrameEnd() override {
@@ -130,7 +130,7 @@ class AidlProfilerImpl : public AidlProfiler {
         return;
       }
     }
-    ALOGE("%s: Error: no profiler accepted First Frame End", __FUNCTION__);
+    ALOGW("%s: Error: no profiler accepted First Frame End", __FUNCTION__);
   }
 
   void ReprocessingRequestStart(
@@ -176,7 +176,7 @@ class AidlProfilerImpl : public AidlProfiler {
     }
     std::shared_ptr<Profiler> profiler = Profiler::Create(latency_flag_);
     if (profiler == nullptr) {
-      ALOGE("%s: Failed to create profiler", __FUNCTION__);
+      ALOGW("%s: Failed to create profiler", __FUNCTION__);
       return nullptr;
     }
     profiler->SetDumpFilePrefix(
@@ -210,7 +210,7 @@ class AidlProfilerImpl : public AidlProfiler {
     }
     std::shared_ptr<Profiler> profiler = Profiler::Create(fps_flag_);
     if (profiler == nullptr) {
-      ALOGE("%s: Failed to create profiler", __FUNCTION__);
+      ALOGW("%s: Failed to create profiler", __FUNCTION__);
       return nullptr;
     }
     profiler->SetDumpFilePrefix("/data/vendor/camera/profiler/aidl_fps_");
@@ -223,7 +223,7 @@ class AidlProfilerImpl : public AidlProfiler {
     }
     std::shared_ptr<Profiler> profiler = Profiler::Create(latency_flag_);
     if (profiler == nullptr) {
-      ALOGE("%s: Failed to create profiler", __FUNCTION__);
+      ALOGW("%s: Failed to create profiler", __FUNCTION__);
       return nullptr;
     }
     profiler->SetDumpFilePrefix("/data/vendor/camera/profiler/aidl_reprocess_");

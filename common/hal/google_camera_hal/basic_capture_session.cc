@@ -300,6 +300,14 @@ status_t BasicCaptureSession::Flush() {
   return request_processor_->Flush();
 }
 
+void BasicCaptureSession::RepeatingRequestEnd(
+    int32_t frame_number, const std::vector<int32_t>& stream_ids) {
+  ATRACE_CALL();
+  if (request_processor_ != nullptr) {
+    return request_processor_->RepeatingRequestEnd(frame_number, stream_ids);
+  }
+}
+
 void BasicCaptureSession::ProcessCaptureResult(
     std::unique_ptr<CaptureResult> result) {
   result_dispatcher_->AddResult(std::move(result));

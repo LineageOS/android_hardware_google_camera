@@ -190,6 +190,15 @@ status_t RealtimeProcessBlock::Flush() {
   return device_session_hwl_->Flush();
 }
 
+void RealtimeProcessBlock::RepeatingRequestEnd(
+    int32_t frame_number, const std::vector<int32_t>& stream_ids) {
+  ATRACE_CALL();
+  std::shared_lock lock(configure_shared_mutex_);
+  if (is_configured_) {
+    device_session_hwl_->RepeatingRequestEnd(frame_number, stream_ids);
+  }
+}
+
 void RealtimeProcessBlock::NotifyHwlPipelineResult(
     std::unique_ptr<HwlPipelineResult> hwl_result) {
   ATRACE_CALL();

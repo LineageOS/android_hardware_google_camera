@@ -51,10 +51,14 @@ RealtimeZslResultRequestProcessor::Create(
     ALOGE("%s: internal_stream_manager is nullptr.", __FUNCTION__);
     return nullptr;
   }
+  if (pixel_format != android_pixel_format_t::HAL_PIXEL_FORMAT_YCBCR_420_888) {
+    ALOGE("%s: only YCBCR_420_888 is supported for YUV ZSL", __FUNCTION__);
+    return nullptr;
+  }
 
   auto result_processor = std::unique_ptr<RealtimeZslResultRequestProcessor>(
       new RealtimeZslResultRequestProcessor(internal_stream_manager, stream_id,
-                                            pixel_format, partial_result_count));
+                                            partial_result_count));
   if (result_processor == nullptr) {
     ALOGE("%s: Creating RealtimeZslResultRequestProcessor failed.",
           __FUNCTION__);
@@ -66,9 +70,9 @@ RealtimeZslResultRequestProcessor::Create(
 
 RealtimeZslResultRequestProcessor::RealtimeZslResultRequestProcessor(
     InternalStreamManager* internal_stream_manager, int32_t stream_id,
-    android_pixel_format_t pixel_format, uint32_t partial_result_count)
+    uint32_t partial_result_count)
     : RealtimeZslResultProcessor(internal_stream_manager, stream_id,
-                                 pixel_format, partial_result_count) {
+                                 partial_result_count) {
 }
 
 void RealtimeZslResultRequestProcessor::UpdateOutputBufferCount(
@@ -117,8 +121,8 @@ void RealtimeZslResultRequestProcessor::ProcessResult(
     pending_request.capture_request->frame_number = result->frame_number;
   }
 
-  // Return filled raw buffer to internal stream manager
-  // And remove raw buffer from result
+  // Return filled buffer to internal stream manager
+  // And remove buffer from result
   status_t res;
   std::vector<StreamBuffer> modified_output_buffers;
   for (uint32_t i = 0; i < result->output_buffers.size(); i++) {
@@ -299,6 +303,15 @@ status_t RealtimeZslResultRequestProcessor::Flush() {
   return process_block_->Flush();
 }
 
+void RealtimeZslResultRequestProcessor::RepeatingRequestEnd(
+    int32_t frame_number, const std::vector<int32_t>& stream_ids) {
+  ATRACE_CALL();
+  std::shared_lock lock(process_block_shared_lock_);
+  if (process_block_ != nullptr) {
+    process_block_->RepeatingRequestEnd(frame_number, stream_ids);
+  }
+}
+
 void RealtimeZslResultRequestProcessor::Notify(
     const ProcessBlockNotifyMessage& block_message) {
   ATRACE_CALL();
@@ -415,7 +428,7 @@ void RealtimeZslResultRequestProcessor::ReturnResultDirectlyForFramesWithErrorsL
     pending_frame_number_to_requests_.erase(result->frame_number);
   }
 
-  // Don't send result to framework if only internal raw callback
+  // Don't send result to framework if only internal callback
   if (has_returned_output_to_internal_stream_manager &&
       result->result_metadata == nullptr && result->output_buffers.size() == 0) {
     return;

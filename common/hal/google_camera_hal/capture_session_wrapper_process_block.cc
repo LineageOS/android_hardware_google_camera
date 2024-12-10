@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
+// #define LOG_NDEBUG 0
 #include <cstddef>
 #include <memory>
 
@@ -200,6 +200,15 @@ status_t CaptureSessionWrapperProcessBlock::Flush() {
   }
 
   return camera_device_session_hwl_->Flush();
+}
+
+void CaptureSessionWrapperProcessBlock::RepeatingRequestEnd(
+    int32_t frame_number, const std::vector<int32_t>& stream_ids) {
+  ATRACE_CALL();
+  std::shared_lock lock(configure_shared_mutex_);
+  if (is_configured_) {
+    camera_device_session_hwl_->RepeatingRequestEnd(frame_number, stream_ids);
+  }
 }
 
 }  // namespace google_camera_hal

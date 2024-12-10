@@ -17,6 +17,8 @@
 #ifndef EMULATOR_STREAM_CONFIGURATION_MAP_H_
 #define EMULATOR_STREAM_CONFIGURATION_MAP_H_
 
+#include <Base.h>
+
 #include <memory>
 #include <set>
 #include <unordered_map>
@@ -61,7 +63,16 @@ class StreamConfigurationMap {
     return stream_output_formats_;
   }
 
-  const std::set<StreamSize>& GetOutputSizes(android_pixel_format_t format) {
+  const std::set<StreamSize>& GetOutputSizes(
+      android_pixel_format_t format,
+      android_dataspace_t dataSpace = HAL_DATASPACE_UNKNOWN) {
+    if ((format == HAL_PIXEL_FORMAT_BLOB) &&
+        (dataSpace ==
+         static_cast<android_dataspace_t>(
+             aidl::android::hardware::graphics::common::Dataspace::JPEG_R))) {
+      return jpegr_stream_output_size_map_[format];
+    }
+
     return stream_output_size_map_[format];
   }
 
@@ -104,6 +115,8 @@ class StreamConfigurationMap {
       const camera_metadata_ro_entry& entry);
   void AppendAvailableStreamMinDurations(const camera_metadata_ro_entry_t& entry);
   void AppendAvailableStreamStallDurations(const camera_metadata_ro_entry& entry);
+  void AppendAvailableJpegRStreamConfigurations(
+      const camera_metadata_ro_entry_t& entry);
 
   const size_t kStreamFormatOffset = 0;
   const size_t kStreamWidthOffset = 1;
@@ -127,6 +140,8 @@ class StreamConfigurationMap {
   std::set<android_pixel_format_t> dynamic_physical_stream_output_formats_;
   std::unordered_map<android_pixel_format_t, std::set<StreamSize>>
       dynamic_physical_stream_output_size_map_;
+  std::unordered_map<android_pixel_format_t, std::set<StreamSize>>
+      jpegr_stream_output_size_map_;
 };
 
 typedef std::unordered_map<uint32_t, std::unique_ptr<StreamConfigurationMap>>

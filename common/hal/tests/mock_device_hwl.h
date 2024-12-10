@@ -89,6 +89,10 @@ class MockDeviceHwl : public CameraDeviceHwl {
     return OK;
   }
 
+  HwlMemoryConfig GetMemoryConfig() const {
+    return HwlMemoryConfig();
+  }
+
   status_t SetTorchMode(TorchMode /*mode*/) {
     return OK;
   }

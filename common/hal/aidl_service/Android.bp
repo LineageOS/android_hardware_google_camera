@@ -58,14 +58,15 @@ python_binary_host {
 }
 
 cc_genrule {
-   name: "aidl_camera_build_version",
-   tool_files: ["version_script.py"],
-   cmd: "python3 $(location version_script.py) $(in) $(out)",
-   vendor: true,
-   srcs: [
-       "aidl_camera_build_version.inl",
-   ],
-   out: ["aidl_camera_build_version.h"],
+    name: "aidl_camera_build_version",
+    tools: ["camera_hal_version_script"],
+    cmd: "$(location camera_hal_version_script) $(in) $(out)",
+    uses_order_only_build_number_file: true,
+    vendor: true,
+    srcs: [
+        "aidl_camera_build_version.inl",
+    ],
+    out: ["aidl_camera_build_version.h"],
 }
 
 cc_defaults {

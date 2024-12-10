@@ -20,6 +20,7 @@
 #include <utils/Errors.h>
 
 #include <set>
+#include <vector>
 
 #include "hal_camera_metadata.h"
 #include "hwl_types.h"
@@ -129,6 +130,9 @@ class CameraDeviceSessionHwl : public PhysicalCameraInfoHwl {
 
   // Flush all pending requests.
   virtual status_t Flush() = 0;
+
+  virtual void RepeatingRequestEnd(int32_t frame_number,
+                                   const std::vector<int32_t>& stream_ids) = 0;
 
   // Return the camera ID that this camera device session is associated with.
   virtual uint32_t GetCameraId() const = 0;

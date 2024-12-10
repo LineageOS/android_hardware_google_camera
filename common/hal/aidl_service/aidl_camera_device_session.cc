@@ -129,6 +129,9 @@ void AidlCameraDeviceSession::ProcessCaptureResult(
         ATRACE_INT64("preview_timestamp_diff", timestamp_diff);
         ATRACE_INT("preview_frame_number", hal_result->frame_number);
       }
+      if (first_request_frame_number_ == hal_result->frame_number) {
+        ATRACE_ASYNC_END("first_preview_frame", 0);
+      }
       preview_timestamp_last_ = timestamp_now;
     }
   }
@@ -142,6 +145,8 @@ void AidlCameraDeviceSession::ProcessCaptureResult(
     return;
   }
   if (aidl_results[0].inputBuffer.streamId != -1) {
+    ALOGI("%s: reprocess_frame %d image complete", __FUNCTION__,
+          aidl_results[0].frameNumber);
     ATRACE_ASYNC_END("reprocess_frame", aidl_results[0].frameNumber);
     aidl_profiler_->ReprocessingResultEnd(aidl_results[0].frameNumber);
   }
@@ -183,6 +188,8 @@ void AidlCameraDeviceSession::ProcessBatchCaptureResult(
     }
 
     if (aidl_result.inputBuffer.streamId != -1) {
+      ALOGI("%s: reprocess_frame %d image complete", __FUNCTION__,
+            aidl_result.frameNumber);
       ATRACE_ASYNC_END("reprocess_frame", aidl_result.frameNumber);
       aidl_profiler_->ReprocessingResultEnd(aidl_result.frameNumber);
     }
@@ -721,10 +728,15 @@ ndk::ScopedAStatus AidlCameraDeviceSession::processCaptureRequest(
     first_request_frame_number_ = requests[0].frameNumber;
     aidl_profiler_->FirstFrameStart();
     ATRACE_ASYNC_BEGIN("first_frame", 0);
+    if (preview_stream_id_ != -1) {
+      ATRACE_ASYNC_BEGIN("first_preview_frame", 0);
+    }
   }
 
   for (const auto& request : requests) {
     if (request.inputBuffer.streamId != -1) {
+      ALOGI("%s: reprocess_frame %d request received", __FUNCTION__,
+            request.frameNumber);
       ATRACE_ASYNC_BEGIN("reprocess_frame", request.frameNumber);
       aidl_profiler_->ReprocessingRequestStart(
           device_session_->GetProfiler(
@@ -822,6 +834,15 @@ ndk::ScopedAStatus AidlCameraDeviceSession::flush() {
         static_cast<int32_t>(Status::INTERNAL_ERROR));
   }
 
+  return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus AidlCameraDeviceSession::repeatingRequestEnd(
+    int32_t in_frameNumber, const std::vector<int32_t>& in_streamIds) {
+  ATRACE_NAME("AidlCameraDeviceSession::repeatingRequestEnd");
+  if (device_session_ != nullptr) {
+    device_session_->RepeatingRequestEnd(in_frameNumber, in_streamIds);
+  }
   return ndk::ScopedAStatus::ok();
 }
 

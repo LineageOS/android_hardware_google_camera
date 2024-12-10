@@ -18,6 +18,7 @@
 #define HARDWARE_GOOGLE_CAMERA_HAL_GOOGLE_CAMERA_HAL_CAPTURE_SESSION_WRAPPER_PROCESS_BLOCK_H_
 
 #include <shared_mutex>
+#include <vector>
 
 #include "camera_device_session.h"
 #include "capture_session.h"
@@ -62,6 +63,9 @@ class CaptureSessionWrapperProcessBlock : public ProcessBlock {
 
   status_t Flush() override;
   // Override functions of ProcessBlock end.
+
+  void RepeatingRequestEnd(int32_t frame_number,
+                           const std::vector<int32_t>& stream_ids) override;
 
  protected:
   CaptureSessionWrapperProcessBlock(
