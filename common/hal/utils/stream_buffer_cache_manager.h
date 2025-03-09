@@ -81,11 +81,11 @@ struct StreamBufferCacheRegInfo {
 // Contains all information returned to the client by GetStreamBuffer function.
 //
 struct StreamBufferRequestResult {
-  // Whether the returned StreamBuffer is a dummy buffer or an actual buffer
-  // obtained from the buffer provider. Client should return the buffer from
-  // providers through the normal result processing functions. There is no need
-  // for clients to return or recycle a dummy buffer returned.
-  bool is_dummy_buffer = false;
+  // Whether the returned StreamBuffer is a placeholder buffer or an actual
+  // buffer obtained from the buffer provider. Client should return the buffer
+  // from providers through the normal result processing functions. There is no
+  // need for clients to return or recycle a placeholder buffer returned.
+  bool is_placeholder_buffer = false;
   // StreamBuffer obtained
   StreamBuffer buffer;
 };
@@ -97,9 +97,9 @@ struct StreamBufferRequestResult {
 // streams. A client needs to register a stream first. It then needs to signal
 // the manager to start caching buffers for that stream. It can then get stream
 // buffers from the manager. The buffers obtained, not matter buffers from buf
-// provider or a dummy buffer, do not need to be returned to the manager. The
-// client should notify the manager to flush all buffers cached before a session
-// can successfully end.
+// provider or a placeholder buffer, do not need to be returned to the manager.
+// The client should notify the manager to flush all buffers cached before a
+// session can successfully end.
 //
 // The manager uses a dedicated thread to asynchronously request/return buffers
 // while clients threads fetch buffers and notify for a change of state.
@@ -126,8 +126,8 @@ class StreamBufferCacheManager {
   // Caller owns the StreamBufferRequestResult and should keep it valid until
   // the function is returned. The ownership of the fences of the StreamBuffer
   // in the StreamBufferRequestResult is transferred to the caller after this
-  // function is returned. In case dummy buffer is returned, the fences are all
-  // nullptr.
+  // function is returned. In case placeholder buffer is returned, the fences
+  // are all nullptr.
   status_t GetStreamBuffer(int32_t stream_id, StreamBufferRequestResult* res);
 
   // Client calls this function to signal the manager to flush all buffers
@@ -138,9 +138,9 @@ class StreamBufferCacheManager {
 
   // Whether stream buffer cache manager can still acquire buffer from the
   // provider successfully(e.g. if a stream is abandoned by the framework, this
-  // returns false). Once a stream is inactive, dummy buffer will be used in all
-  // following GetStreamBuffer calling. Calling NotifyFlushingAll does not make
-  // a change in this case.
+  // returns false). Once a stream is inactive, placeholder buffer will be used
+  // in all following GetStreamBuffer calling. Calling NotifyFlushingAll does
+  // not make a change in this case.
   status_t IsStreamActive(int32_t stream_id, bool* is_active);
 
  protected:
@@ -164,12 +164,12 @@ class StreamBufferCacheManager {
     // for and interfaces for buffer return and request.
     // notify is the function for each stream buffer cache to notify the manager
     // for new thread loop work load.
-    // dummy_buffer_allocator allocates the dummy buffer needed when buffer
-    // provider can not fulfill a buffer request any more.
+    // placeholder_buffer_allocator allocates the placeholder buffer needed when
+    // buffer provider can not fulfill a buffer request any more.
     static std::unique_ptr<StreamBufferCache> Create(
         const StreamBufferCacheRegInfo& reg_info,
         NotifyManagerThreadWorkloadFunc notify,
-        IHalBufferAllocator* dummy_buffer_allocator);
+        IHalBufferAllocator* placeholder_buffer_allocator);
 
     virtual ~StreamBufferCache() = default;
 
@@ -179,8 +179,8 @@ class StreamBufferCacheManager {
     // is true.
     status_t UpdateCache(bool forced_flushing);
 
-    // Get a buffer for the client. The buffer returned can be a dummy buffer,
-    // in which case, the is_dummy_buffer field in res will be true.
+    // Get a buffer for the client. The buffer returned can be a placeholder
+    // buffer, in which case, the is_ field in res will be true.
     status_t GetBuffer(StreamBufferRequestResult* res);
 
     // Activate or deactivate the stream buffer cache manager. The stream
@@ -199,7 +199,7 @@ class StreamBufferCacheManager {
    protected:
     StreamBufferCache(const StreamBufferCacheRegInfo& reg_info,
                       NotifyManagerThreadWorkloadFunc notify,
-                      IHalBufferAllocator* dummy_buffer_allocator);
+                      IHalBufferAllocator* placeholder_buffer_allocator);
 
    private:
     // Flush all buffers acquired from the buffer provider. Return the acquired
@@ -210,7 +210,7 @@ class StreamBufferCacheManager {
     // Refill the cached buffers by trying to acquire buffers from the buffer
     // provider using request_func. If the provider can not fulfill the request
     // by returning an empty buffer vector. The stream buffer cache will be
-    // providing dummy buffer for all following requests.
+    // providing placeholder buffer for all following requests.
     // TODO(b/136107942): Only one thread(currently the manager's workload thread)
     //                    should call this function to avoid unexpected racing
     //                    condition. This will be fixed by taking advantage of
@@ -222,13 +222,13 @@ class StreamBufferCacheManager {
     // The cache_access_mutex_ must be locked when calling this function.
     bool RefillableLocked() const;
 
-    // Allocate dummy buffer for this stream buffer cache. The
+    // Allocate placeholder buffer for this stream buffer cache. The
     // cache_access_mutex_ needs to be locked before calling this function.
-    status_t AllocateDummyBufferLocked();
+    status_t AllocatePlaceholderBufferLocked();
 
-    // Release allocated dummy buffer when StreamBufferCache exiting.
+    // Release allocated placeholder buffer when StreamBufferCache exiting.
     // The cache_access_mutex_ needs to be locked before calling this function.
-    void ReleaseDummyBufferLocked();
+    void ReleasePlaceholderBufferLocked();
 
     // Any access to the cache content must be guarded by this mutex.
     std::mutex cache_access_mutex_;
@@ -241,19 +241,19 @@ class StreamBufferCacheManager {
     // Whether the stream this cache is for has been deactived. The stream is
     // labeled as deactived when kStreamDisconnected or kUnknownError is
     // returned by a request_func_. In this case, all following request_func_ is
-    // expected to raise the same error. So dummy buffer will be used directly
-    // without wasting the effort to call request_func_ again. Error code
-    // kNoBufferAvailable and kMaxBufferExceeded should not cause this to be
-    // labeled as true. The next UpdateCache status should still try to refill
-    // the cache.
+    // expected to raise the same error. So placeholder buffer will be used
+    // directly without wasting the effort to call request_func_ again. Error
+    // code kNoBufferAvailable and kMaxBufferExceeded should not cause this to
+    // be labeled as true. The next UpdateCache status should still try to
+    // refill the cache.
     bool stream_deactived_ = false;
-    // Dummy StreamBuffer reserved for errorneous situation. In case there is
-    // not available cached buffers, this dummy buffer is used to allow the
-    // client to continue its ongoing work without crashing. This dummy buffer
-    // is reused and should not be returned to the buf provider. If this buffer
-    // is returned, the is_dummy_buffer_ flag in the BufferRequestResult must be
-    // set to true.
-    StreamBuffer dummy_buffer_;
+    // Placeholder StreamBuffer reserved for errorneous situation. In case there
+    // is not available cached buffers, this placeholder buffer is used to allow
+    // the client to continue its ongoing work without crashing. This
+    // placeholder buffer is reused and should not be returned to the buf
+    // provider. If this buffer is returned, the is__ flag in the
+    // BufferRequestResult must be set to true.
+    StreamBuffer placeholder_buffer_;
     // StreamBufferCacheManager does not refill a StreamBufferCache until this
     // is set true by the client. Client should set this flag to true after the
     // buffer provider (e.g. framework) is ready to handle buffer requests, or
@@ -262,9 +262,9 @@ class StreamBufferCacheManager {
     bool is_active_ = false;
     // Interface to notify the parent manager for new threadloop workload.
     NotifyManagerThreadWorkloadFunc notify_for_workload_ = nullptr;
-    // Allocator of the dummy buffer for this stream. The stream buffer cache
+    // Allocator of the placeholder buffer for this stream. The stream buffer cache
     // manager owns this throughout the life cycle of this stream buffer cahce.
-    IHalBufferAllocator* dummy_buffer_allocator_ = nullptr;
+    IHalBufferAllocator* placeholder_buffer_allocator_ = nullptr;
   };
 
   // Add stream buffer cache. Lock caches_map_mutex_ before calling this func.
@@ -303,9 +303,10 @@ class StreamBufferCacheManager {
   // Whether a processing request has been notified. Change to this must be
   // guarded by request_return_mutex_;
   bool has_new_workload_ = false;
-  // The dummy buffer allocator allocates the dummy buffer. It only allocates
-  // the dummy buffer when a stream buffer cache is NotifyProviderReadiness.
-  std::unique_ptr<IHalBufferAllocator> dummy_buffer_allocator_;
+  // The placeholder buffer allocator allocates the placeholder buffer. It only
+  // allocates the placeholder buffer when a stream buffer cache is
+  // NotifyProviderReadiness.
+  std::unique_ptr<IHalBufferAllocator> placeholder_buffer_allocator_;
 
   // Guards NotifyFlushingAll. In case the workload thread is processing workload,
   // the NotifyFlushingAll calling should wait until workload loop is done. This

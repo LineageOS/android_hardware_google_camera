@@ -35,26 +35,25 @@ TEST(CameraVendorTagTest, TestCharacteristics) {
   auto hal_metadata = HalCameraMetadata::Create(kNumEntries, kDataBytes);
   ASSERT_NE(hal_metadata, nullptr) << "Creating hal_metadata failed.";
 
-  std::vector<uint32_t> dummy_keys = {
-      VendorTagIds::kLogicalCamDefaultPhysicalId};
-  status_t res = hal_metadata->Set(
-      ANDROID_REQUEST_AVAILABLE_REQUEST_KEYS,
-      reinterpret_cast<int32_t*>(dummy_keys.data()), dummy_keys.size());
+  std::vector<uint32_t> test_keys = {VendorTagIds::kLogicalCamDefaultPhysicalId};
+  status_t res = hal_metadata->Set(ANDROID_REQUEST_AVAILABLE_REQUEST_KEYS,
+                                   reinterpret_cast<int32_t*>(test_keys.data()),
+                                   test_keys.size());
   ASSERT_EQ(res, OK);
 
   res = hal_metadata->Set(ANDROID_REQUEST_AVAILABLE_RESULT_KEYS,
-                          reinterpret_cast<int32_t*>(dummy_keys.data()),
-                          dummy_keys.size());
+                          reinterpret_cast<int32_t*>(test_keys.data()),
+                          test_keys.size());
   ASSERT_EQ(res, OK);
 
   res = hal_metadata->Set(ANDROID_REQUEST_AVAILABLE_SESSION_KEYS,
-                          reinterpret_cast<int32_t*>(dummy_keys.data()),
-                          dummy_keys.size());
+                          reinterpret_cast<int32_t*>(test_keys.data()),
+                          test_keys.size());
   ASSERT_EQ(res, OK);
 
   res = hal_metadata->Set(ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS,
-                          reinterpret_cast<int32_t*>(dummy_keys.data()),
-                          dummy_keys.size());
+                          reinterpret_cast<int32_t*>(test_keys.data()),
+                          test_keys.size());
   ASSERT_EQ(res, OK);
 
   res = hal_vendor_tag_utils::ModifyCharacteristicsKeys(hal_metadata.get());

@@ -851,7 +851,7 @@ void EmulatedCameraProviderHwlImpl::WaitForStatusCallbackFuture() {
   {
     std::lock_guard<std::mutex> lock(status_callback_future_lock_);
     if (!status_callback_future_.valid()) {
-      // If there is no future pending, construct a dummy one.
+      // If there is no future pending, construct an empty one.
       status_callback_future_ = std::async([]() { return; });
     }
   }

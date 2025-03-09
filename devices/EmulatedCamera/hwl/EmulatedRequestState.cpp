@@ -542,6 +542,19 @@ status_t EmulatedRequestState::ProcessAE() {
       ALOGE("%s: Failed during AE compensation: %d, (%s)", __FUNCTION__, ret,
             strerror(-ret));
     }
+    if (info.ae_priority_mode_ == ANDROID_CONTROL_AE_PRIORITY_MODE_SENSOR_EXPOSURE_TIME_PRIORITY) {
+      auto ret = request_settings_->Get(ANDROID_SENSOR_EXPOSURE_TIME, &entry);
+      if ((ret == OK) && (entry.count == 1)) {
+        info.sensor_exposure_time_  = GetExposureTimeClampToRange(entry.data.i64[0]);
+      }
+    }
+
+    if (info.ae_priority_mode_ == ANDROID_CONTROL_AE_PRIORITY_MODE_SENSOR_SENSITIVITY_PRIORITY) {
+      auto ret = request_settings_->Get(ANDROID_SENSOR_SENSITIVITY, &entry);
+      if ((ret == OK) && (entry.count == 1)) {
+        info.sensor_sensitivity_ = GetSensitivityClampToRange(entry.data.i32[0]);
+      }
+    }
   } else {
     ALOGI(
         "%s: No emulation for current AE mode using previous sensor settings!",
@@ -580,6 +593,34 @@ status_t EmulatedRequestState::ProcessAE() {
   }
 
   return OK;
+}
+
+int EmulatedRequestState::GetSensitivityClampToRange(uint32_t sensitivity) {
+  auto& info = *device_info_;
+  uint32_t min_sensitivity = info.sensor_sensitivity_range_.first;
+  uint32_t max_sensitivity = info.sensor_sensitivity_range_.second;
+
+  if ((sensitivity < min_sensitivity) ||
+      (sensitivity > max_sensitivity)) {
+    ALOGW("%s: Sensor sensitivity %d not within supported range[%d, %d]",
+        __FUNCTION__, sensitivity, min_sensitivity, max_sensitivity);
+  }
+
+  return std::max(min_sensitivity, std::min(max_sensitivity, sensitivity));
+}
+
+int EmulatedRequestState::GetExposureTimeClampToRange(uint32_t exposure) {
+  auto& info = *device_info_;
+  uint32_t min_exposure = info.sensor_exposure_time_range_.first;
+  uint32_t max_exposure = info.sensor_exposure_time_range_.second;
+
+  if ((exposure < min_exposure) ||
+      (exposure > max_exposure)) {
+    ALOGW("%s: Sensor exposure time %d not within supported range[%d, %d]",
+        __FUNCTION__, exposure, min_exposure, max_exposure);
+  }
+
+  return std::max(min_exposure, std::min(max_exposure, exposure));
 }
 
 status_t EmulatedRequestState::InitializeSensorSettings(
@@ -775,6 +816,16 @@ status_t EmulatedRequestState::InitializeSensorSettings(
       }
     }
 
+    ret = request_settings_->Get(ANDROID_CONTROL_AE_PRIORITY_MODE, &entry);
+    if ((ret == OK) && (entry.count == 1)) {
+      if (info.available_ae_priority_modes_.find(entry.data.u8[0]) !=
+          info.available_ae_priority_modes_.end()) {
+        info.ae_priority_mode_ = entry.data.u8[0];
+      } else {
+        ALOGE("%s: Unsupported AE priority mode! Using last valid mode!", __FUNCTION__);
+      }
+    }
+
     ret = request_settings_->Get(ANDROID_CONTROL_AWB_MODE, &entry);
     if ((ret == OK) && (entry.count == 1)) {
       if (info.available_awb_modes_.find(entry.data.u8[0]) !=
@@ -919,6 +970,17 @@ std::unique_ptr<HwlPipelineResult> EmulatedRequestState::InitializeResult(
   result->result_metadata->Set(ANDROID_CONTROL_AWB_MODE, &info.awb_mode_, 1);
   result->result_metadata->Set(ANDROID_CONTROL_AWB_STATE, &info.awb_state_, 1);
   result->result_metadata->Set(ANDROID_CONTROL_AE_MODE, &info.ae_mode_, 1);
+
+  if (info.ae_mode_ == ANDROID_CONTROL_AE_MODE_OFF) {
+    // AE Priority mode should not work with AE mode OFF
+    uint8_t ae_priority_mode_off = ANDROID_CONTROL_AE_PRIORITY_MODE_OFF;
+    result->result_metadata->Set(ANDROID_CONTROL_AE_PRIORITY_MODE,
+            &ae_priority_mode_off, 1);
+  } else {
+    result->result_metadata->Set(ANDROID_CONTROL_AE_PRIORITY_MODE,
+            &info.ae_priority_mode_, 1);
+  }
+
   result->result_metadata->Set(ANDROID_CONTROL_AE_STATE, &info.ae_state_, 1);
   // If the overriding frame number isn't larger than current frame number,
   // use 0.

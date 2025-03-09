@@ -93,14 +93,14 @@ TEST(CameraIdMangerTest, InvalidParameters) {
   auto id_manager = CameraIdManager::Create(cameras);
   ASSERT_NE(id_manager, nullptr);
 
-  uint32_t dummy = 0;
+  uint32_t invalid_id = 0;
   status_t res;
   // Test for invalid IDs or bad parameters
-  res = id_manager->GetInternalCameraId(cameras.size(), &dummy);
+  res = id_manager->GetInternalCameraId(cameras.size(), &invalid_id);
   EXPECT_NE(res, OK) << "GetInternalCameraId() succeeded with an invalid ID";
   res = id_manager->GetInternalCameraId(cameras.size(), nullptr);
   EXPECT_NE(res, OK) << "GetInternalCameraId() succeeded with a null parameter";
-  res = id_manager->GetPublicCameraId(cameras.size(), &dummy);
+  res = id_manager->GetPublicCameraId(cameras.size(), &invalid_id);
   EXPECT_NE(res, OK) << "GetPublicCameraId() succeeded with an invalid ID";
   res = id_manager->GetPublicCameraId(cameras.size(), nullptr);
   EXPECT_NE(res, OK) << "GetPublicCameraId() succeeded with a null parameter";

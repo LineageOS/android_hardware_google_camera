@@ -21,6 +21,10 @@
 #include <aidl/android/hardware/camera/provider/ICameraProviderCallback.h>
 
 #include <regex>
+#include <string>
+#ifdef __ANDROID_APEX__
+#include <unordered_set>
+#endif
 
 #include "camera_provider.h"
 
@@ -88,6 +92,11 @@ class AidlCameraProvider : public BnCameraProvider {
 
   std::unique_ptr<CameraProvider> google_camera_provider_;
   google_camera_hal::CameraProviderCallback camera_provider_callback_;
+
+#ifdef __ANDROID_APEX__
+  std::unordered_set<uint32_t> available_camera_ids_;
+  bool camera_device_initialized_ = false;
+#endif
 };
 
 }  // namespace implementation

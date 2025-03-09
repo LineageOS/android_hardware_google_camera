@@ -147,7 +147,7 @@ TEST_F(RequestProcessorTest, BasicRequestProcessorRequest) {
 
   EXPECT_EQ(request_processor->SetProcessBlock(std::move(process_block)), OK);
 
-  // Testing BasicRequestProcessorRequest with a dummy request.
+  // Testing BasicRequestProcessorRequest with an empty request.
   CaptureRequest request = {};
   ASSERT_EQ(request_processor->ProcessRequest(request), OK);
 }

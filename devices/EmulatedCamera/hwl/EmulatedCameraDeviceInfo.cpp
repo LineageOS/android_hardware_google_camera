@@ -583,6 +583,14 @@ status_t EmulatedCameraDeviceInfo::InitializeControlAEDefaults() {
     ALOGE("%s: No available AE modes!", __FUNCTION__);
     return BAD_VALUE;
   }
+
+  ret = static_metadata_->Get(ANDROID_CONTROL_AE_AVAILABLE_PRIORITY_MODES, &entry);
+  if (ret == OK) {
+    available_ae_priority_modes_.insert(entry.data.u8, entry.data.u8 + entry.count);
+  } else {
+    ALOGV("%s: No available AE priority modes!", __FUNCTION__);
+  }
+
   // On mode must always be present
   if (available_ae_modes_.find(ANDROID_CONTROL_AE_MODE_ON) ==
       available_ae_modes_.end()) {

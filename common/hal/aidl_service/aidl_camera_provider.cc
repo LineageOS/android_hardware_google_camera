@@ -15,7 +15,7 @@
  */
 
 #define LOG_TAG "GCH_AidlCameraProvider"
-//#define LOG_NDEBUG 0
+// #define LOG_NDEBUG 0
 #include "aidl_camera_provider.h"
 
 #include <log/log.h>
@@ -187,23 +187,11 @@ ScopedAStatus AidlCameraProvider::setCallback(
         static_cast<int32_t>(Status::ILLEGAL_ARGUMENT));
   }
 
-  bool first_time = false;
   {
     std::unique_lock<std::mutex> lock(callbacks_lock_);
-    first_time = callbacks_ == nullptr;
     callbacks_ = callback;
   }
   google_camera_provider_->TriggerDeferredCallbacks();
-#ifdef __ANDROID_APEX__
-  if (first_time) {
-    std::string ready_property_name = "vendor.camera.hal.ready.count";
-    int ready_count = property_get_int32(ready_property_name.c_str(), 0);
-    property_set(ready_property_name.c_str(),
-                 std::to_string(++ready_count).c_str());
-    ALOGI("AidlCameraProvider::setCallback() first time ready count: %d ",
-          ready_count);
-  }
-#endif
   return ScopedAStatus::ok();
 }
 
@@ -258,6 +246,12 @@ ScopedAStatus AidlCameraProvider::getCameraIdList(
         "device@" + device::implementation::AidlCameraDevice::kDeviceVersion +
         "/" + kProviderName + "/" + std::to_string(camera_ids[i]);
   }
+#ifdef __ANDROID_APEX__
+  if (!camera_device_initialized_ && available_camera_ids_.empty()) {
+    available_camera_ids_ =
+        std::unordered_set<uint32_t>(camera_ids.begin(), camera_ids.end());
+  }
+#endif
   return ScopedAStatus::ok();
 }
 
@@ -369,8 +363,9 @@ ScopedAStatus AidlCameraProvider::getCameraDeviceInterface(
         static_cast<int32_t>(Status::ILLEGAL_ARGUMENT));
   }
 
+  int camera_id_int = atoi(camera_id.c_str());
   status_t res = google_camera_provider_->CreateCameraDevice(
-      atoi(camera_id.c_str()), &google_camera_device);
+      camera_id_int, &google_camera_device);
   if (res != OK) {
     ALOGE("%s: Creating CameraDevice failed: %s(%d)", __FUNCTION__,
           strerror(-res), res);
@@ -384,6 +379,22 @@ ScopedAStatus AidlCameraProvider::getCameraDeviceInterface(
     return ScopedAStatus::fromServiceSpecificError(
         static_cast<int32_t>(Status::INTERNAL_ERROR));
   }
+
+#ifdef __ANDROID_APEX__
+  available_camera_ids_.erase(camera_id_int);
+  if (!camera_device_initialized_ && available_camera_ids_.empty()) {
+    camera_device_initialized_ = true;
+
+    std::string ready_property_name = "vendor.camera.hal.ready.count";
+    int ready_count = property_get_int32(ready_property_name.c_str(), 0);
+    property_set(ready_property_name.c_str(),
+                 std::to_string(++ready_count).c_str());
+    ALOGI(
+        "AidlCameraProvider::getCameraDeviceInterface() first time ready "
+        "count: %d ",
+        ready_count);
+  }
+#endif
   return ScopedAStatus::ok();
 }
 

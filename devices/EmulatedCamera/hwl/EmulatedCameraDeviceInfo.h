@@ -165,6 +165,7 @@ struct EmulatedCameraDeviceInfo {
 
   std::set<uint8_t> available_control_modes_;
   std::set<uint8_t> available_ae_modes_;
+  std::set<uint8_t> available_ae_priority_modes_;
   std::set<uint8_t> available_af_modes_;
   std::set<uint8_t> available_awb_modes_;
   std::set<uint8_t> available_scenes_;
@@ -192,6 +193,7 @@ struct EmulatedCameraDeviceInfo {
   uint8_t sensor_pixel_mode_ = ANDROID_SENSOR_PIXEL_MODE_DEFAULT;
   uint8_t scene_mode_ = ANDROID_CONTROL_SCENE_MODE_DISABLED;
   uint8_t ae_mode_ = ANDROID_CONTROL_AE_MODE_ON;
+  uint8_t ae_priority_mode_ = ANDROID_CONTROL_AE_PRIORITY_MODE_OFF;
   uint8_t awb_mode_ = ANDROID_CONTROL_AWB_MODE_AUTO;
   uint8_t af_mode_ = ANDROID_CONTROL_AF_MODE_AUTO;
   uint8_t ae_lock_ = ANDROID_CONTROL_AE_LOCK_OFF;

@@ -198,7 +198,7 @@ TEST_F(ProcessBlockTest, RealtimeProcessBlockRequest) {
 
   ASSERT_EQ(block->SetResultProcessor(std::move(result_processor)), OK);
 
-  // Testing RealtimeProcessBlock with a dummy request.
+  // Testing RealtimeProcessBlock with an empty request.
   std::vector<ProcessBlockRequest> block_requests(1);
   ASSERT_EQ(block->ProcessRequests(block_requests, block_requests[0].request),
             OK);
@@ -238,7 +238,7 @@ TEST_F(ProcessBlockTest, MultiCameraRtProcessBlockRequest) {
 
   ASSERT_EQ(block->SetResultProcessor(std::move(result_processor)), OK);
 
-  // Testing RealtimeProcessBlock with dummy requests.
+  // Testing RealtimeProcessBlock with some requests.
   std::vector<ProcessBlockRequest> block_requests;
   CaptureRequest remaining_session_requests;
 

@@ -179,8 +179,8 @@ TEST(InternalStreamManagerTests, GetStreamBuffer) {
   HalStream preview_hal_stream = kPreviewHalStreamTemplate;
 
   // Get buffer from an invalid stream.
-  StreamBuffer dummy_buffer;
-  EXPECT_NE(stream_manager->GetStreamBuffer(/*stream_id=*/-1, &dummy_buffer), OK)
+  StreamBuffer invalid_buffer;
+  EXPECT_NE(stream_manager->GetStreamBuffer(/*stream_id=*/-1, &invalid_buffer), OK)
       << "Getting a buffer from an invalid stream should fail";
 
   // Register and allocate buffers.

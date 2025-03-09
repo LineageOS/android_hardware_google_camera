@@ -2,8 +2,15 @@ package: "libgooglecamerahal.flags"
 container: "vendor"
 
 flag {
-  name: "zsl_video_denoise_in_hwl"
+  name: "zsl_video_denoise_in_hwl_two"
   namespace: "camera_hal"
   description: "Enable HWL ZSL video processing and disable GCH processing"
   bug: "341748497"
+}
+
+flag {
+  name: "disable_capture_request_timeout"
+  namespace: "camera_hal"
+  description: "Disable capture request timeout logic in GCH layer"
+  bug: "372255560"
 }

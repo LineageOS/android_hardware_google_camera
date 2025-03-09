@@ -17,10 +17,12 @@
 // #define LOG_NDEBUG 0
 #define LOG_TAG "GCH_PendingRequestsTracker"
 #define ATRACE_TAG ATRACE_TAG_CAMERA
+#include "pending_requests_tracker.h"
+
 #include <log/log.h>
 #include <utils/Trace.h>
 
-#include "pending_requests_tracker.h"
+#include "libgooglecamerahal_flags.h"
 
 namespace android {
 namespace google_camera_hal {
@@ -284,12 +286,19 @@ status_t PendingRequestsTracker::WaitAndTrackRequestBuffers(
   }
 
   std::unique_lock<std::mutex> lock(pending_requests_mutex_);
-  if (!tracker_request_condition_.wait_for(
-          lock, std::chrono::milliseconds(kTrackerTimeoutMs), [this, &request] {
-            return DoStreamsHaveEnoughBuffersLocked(request.output_buffers);
-          })) {
-    ALOGE("%s: Waiting for buffer ready timed out.", __FUNCTION__);
-    return TIMED_OUT;
+  if (libgooglecamerahal::flags::disable_capture_request_timeout()) {
+    tracker_request_condition_.wait(lock, [this, &request] {
+      return DoStreamsHaveEnoughBuffersLocked(request.output_buffers);
+    });
+  } else {
+    constexpr uint32_t kTrackerTimeoutMs = 3000;
+    if (!tracker_request_condition_.wait_for(
+            lock, std::chrono::milliseconds(kTrackerTimeoutMs), [this, &request] {
+              return DoStreamsHaveEnoughBuffersLocked(request.output_buffers);
+            })) {
+      ALOGE("%s: Waiting for buffer ready timed out.", __FUNCTION__);
+      return TIMED_OUT;
+    }
   }
 
   ALOGV("%s: all streams are ready", __FUNCTION__);
@@ -315,7 +324,8 @@ status_t PendingRequestsTracker::WaitAndTrackAcquiredBuffers(
   int32_t overridden_stream_id = OverrideStreamIdForGroup(stream_id);
   if (hal_buffer_managed_stream_ids_.find(stream_id) ==
       hal_buffer_managed_stream_ids_.end()) {
-    // Pending requests tracker doesn't track stream ids which aren't HAL buffer managed
+    // Pending requests tracker doesn't track stream ids which aren't HAL buffer
+    // managed
     return OK;
   }
   if (!IsStreamConfigured(overridden_stream_id)) {
@@ -352,7 +362,8 @@ void PendingRequestsTracker::TrackBufferAcquisitionFailure(int32_t stream_id,
   }
   if (hal_buffer_managed_stream_ids_.find(stream_id) ==
       hal_buffer_managed_stream_ids_.end()) {
-    // Pending requests tracker doesn't track stream ids which aren't HAL buffer managed
+    // Pending requests tracker doesn't track stream ids which aren't HAL buffer
+    // managed
     return;
   }
   std::unique_lock<std::mutex> lock(pending_acquisition_mutex_);
@@ -381,7 +392,8 @@ void PendingRequestsTracker::DumpStatus() {
   pending_acquisition_string += "}";
 
   ALOGI(
-      "%s: Buffers (including dummy) pending return from HWL: %s. Buffers "
+      "%s: Buffers (including placeholder) pending return from HWL: %s. "
+      "Buffers "
       "proactively acquired from the framework: %s.",
       __FUNCTION__, pending_requests_string.c_str(),
       pending_acquisition_string.c_str());

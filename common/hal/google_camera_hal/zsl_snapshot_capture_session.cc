@@ -734,7 +734,7 @@ status_t ZslSnapshotCaptureSession::Initialize(
   res = characteristics->Get(VendorTagIds::kVideoSwDenoiseEnabled,
                              &video_sw_denoise_entry);
   if (res == OK && video_sw_denoise_entry.data.u8[0] == 1) {
-    if (libgooglecamerahal::flags::zsl_video_denoise_in_hwl()) {
+    if (libgooglecamerahal::flags::zsl_video_denoise_in_hwl_two()) {
       ALOGI("%s: video sw denoise is enabled in HWL", __FUNCTION__);
     } else {
       video_sw_denoise_enabled_ = true;

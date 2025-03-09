@@ -54,7 +54,7 @@ class FakeCameraDeviceSessionHwl : public CameraDeviceSessionHwl {
 
   status_t BuildPipelines() override;
 
-  // This fake method fills a few dummy streams to streams.
+  // This fake method fills a few placeholder streams to streams.
   // Currently only supports kOfflineSmoothTransitionRole.
   status_t GetRequiredIntputStreams(const StreamConfiguration& overall_config,
                                     HwlOfflinePipelineRole pipeline_role,
@@ -130,7 +130,7 @@ class MockDeviceSessionHwl : public CameraDeviceSessionHwl {
   // Initialize a mock camera device session HWL for a camera ID.
   // If physical_camera_ids is not empty, it will consist of the physical camera
   // IDs.
-  MockDeviceSessionHwl(uint32_t camera_id = 3,  // Dummy camera ID
+  MockDeviceSessionHwl(uint32_t camera_id = 3,
                        const std::vector<uint32_t>& physical_camera_ids =
                            std::vector<uint32_t>());
 

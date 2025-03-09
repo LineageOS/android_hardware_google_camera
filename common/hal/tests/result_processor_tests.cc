@@ -25,8 +25,8 @@
 namespace android {
 namespace google_camera_hal {
 
-static constexpr native_handle kDummyNativeHandle = {};
-static constexpr buffer_handle_t kDummyBufferHandle = &kDummyNativeHandle;
+static constexpr native_handle kTestNativeHandle = {};
+static constexpr buffer_handle_t kTestBufferHandle = &kTestNativeHandle;
 
 using ResultProcessorCreateFunc =
     std::function<std::unique_ptr<ResultProcessor>()>;
@@ -177,7 +177,7 @@ TEST(ResultProcessorTest, BasicResultProcessorAddPendingRequest) {
   requests[0].request.output_buffers = {StreamBuffer{}};
 
   CaptureRequest remaining_request;
-  remaining_request.output_buffers.push_back({.buffer = kDummyBufferHandle});
+  remaining_request.output_buffers.push_back({.buffer = kTestBufferHandle});
   EXPECT_NE(result_processor->AddPendingRequests(requests, remaining_request), OK)
       << "Adding a pending request with a remaining output buffer that's not"
       << "included in the request should fail.";

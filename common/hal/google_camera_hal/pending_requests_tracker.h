@@ -74,9 +74,6 @@ class PendingRequestsTracker {
   PendingRequestsTracker() = default;
 
  private:
-  // Duration to wait for stream buffers to be available.
-  static constexpr uint32_t kTrackerTimeoutMs = 3000;
-
   // Duration to wait for when requesting buffer
   static constexpr uint32_t kAcquireBufferTimeoutMs = 50;
 

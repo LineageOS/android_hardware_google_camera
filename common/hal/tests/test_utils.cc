@@ -26,10 +26,10 @@ namespace android {
 namespace google_camera_hal {
 namespace test_utils {
 
-void GetDummyPreviewStream(Stream* stream, uint32_t width, uint32_t height,
-                           bool is_physical_camera_stream = false,
-                           uint32_t physical_camera_id = 0,
-                           uint32_t stream_id = 0) {
+void GetTestPreviewStream(Stream* stream, uint32_t width, uint32_t height,
+                          bool is_physical_camera_stream = false,
+                          uint32_t physical_camera_id = 0,
+                          uint32_t stream_id = 0) {
   ASSERT_NE(stream, nullptr);
 
   *stream = {};
@@ -50,7 +50,7 @@ void GetPreviewOnlyStreamConfiguration(StreamConfiguration* config,
   ASSERT_NE(config, nullptr);
 
   Stream preview_stream = {};
-  GetDummyPreviewStream(&preview_stream, width, height);
+  GetTestPreviewStream(&preview_stream, width, height);
 
   *config = {};
   config->streams.push_back(preview_stream);
@@ -69,9 +69,9 @@ void GetPhysicalPreviewStreamConfiguration(
   int32_t stream_id = 0;
   for (auto& camera_id : physical_camera_ids) {
     Stream preview_stream;
-    GetDummyPreviewStream(&preview_stream, width, height,
-                          /*is_physical_camera_stream=*/true, camera_id,
-                          stream_id++);
+    GetTestPreviewStream(&preview_stream, width, height,
+                         /*is_physical_camera_stream=*/true, camera_id,
+                         stream_id++);
     config->streams.push_back(preview_stream);
   }
 }

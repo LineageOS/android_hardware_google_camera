@@ -69,6 +69,8 @@ class EmulatedRequestState {
   status_t Update3AMeteringRegion(uint32_t tag,
                                   const HalCameraMetadata& settings,
                                   int32_t* region /*out*/);
+  int GetSensitivityClampToRange(uint32_t sensitivity);
+  int GetExposureTimeClampToRange(uint32_t exposure);
 
   std::mutex request_state_mutex_;
   std::unique_ptr<HalCameraMetadata> request_settings_;

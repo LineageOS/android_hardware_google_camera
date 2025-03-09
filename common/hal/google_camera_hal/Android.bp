@@ -64,7 +64,6 @@ cc_library_shared {
     vendor: true,
     compile_multilib: "first",
     ldflags: [
-        "-Wl,--rpath,/system/${LIB}/camera/capture_sessions",
         "-Wl,--rpath,/vendor/${LIB}/camera/capture_sessions",
     ],
     srcs: [

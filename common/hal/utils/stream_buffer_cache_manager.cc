@@ -83,8 +83,8 @@ std::unique_ptr<StreamBufferCacheManager> StreamBufferCacheManager::Create(
     return nullptr;
   }
 
-  manager->dummy_buffer_allocator_ = GrallocBufferAllocator::Create();
-  if (manager->dummy_buffer_allocator_ == nullptr) {
+  manager->placeholder_buffer_allocator_ = GrallocBufferAllocator::Create();
+  if (manager->placeholder_buffer_allocator_ == nullptr) {
     ALOGE("%s: Failed to create gralloc buffer allocator", __FUNCTION__);
     return nullptr;
   }
@@ -246,7 +246,7 @@ status_t StreamBufferCacheManager::AddStreamBufferCacheLocked(
     const StreamBufferCacheRegInfo& reg_info) {
   auto stream_buffer_cache = StreamBufferCacheManager::StreamBufferCache::Create(
       reg_info, [this] { this->NotifyThreadWorkload(); },
-      dummy_buffer_allocator_.get());
+      placeholder_buffer_allocator_.get());
   if (stream_buffer_cache == nullptr) {
     ALOGE("%s: Failed to create StreamBufferCache for stream %d", __FUNCTION__,
           reg_info.stream_id);
@@ -313,16 +313,16 @@ std::unique_ptr<StreamBufferCacheManager::StreamBufferCache>
 StreamBufferCacheManager::StreamBufferCache::Create(
     const StreamBufferCacheRegInfo& reg_info,
     NotifyManagerThreadWorkloadFunc notify,
-    IHalBufferAllocator* dummy_buffer_allocator) {
-  if (notify == nullptr || dummy_buffer_allocator == nullptr) {
-    ALOGE("%s: notify is nullptr or dummy_buffer_allocator is nullptr.",
+    IHalBufferAllocator* placeholder_buffer_allocator) {
+  if (notify == nullptr || placeholder_buffer_allocator == nullptr) {
+    ALOGE("%s: notify is nullptr or placeholder_buffer_allocator is nullptr.",
           __FUNCTION__);
     return nullptr;
   }
 
   auto cache = std::unique_ptr<StreamBufferCacheManager::StreamBufferCache>(
-      new StreamBufferCacheManager::StreamBufferCache(reg_info, notify,
-                                                      dummy_buffer_allocator));
+      new StreamBufferCacheManager::StreamBufferCache(
+          reg_info, notify, placeholder_buffer_allocator));
   if (cache == nullptr) {
     ALOGE("%s: Failed to create stream buffer cache.", __FUNCTION__);
     return nullptr;
@@ -334,11 +334,11 @@ StreamBufferCacheManager::StreamBufferCache::Create(
 StreamBufferCacheManager::StreamBufferCache::StreamBufferCache(
     const StreamBufferCacheRegInfo& reg_info,
     NotifyManagerThreadWorkloadFunc notify,
-    IHalBufferAllocator* dummy_buffer_allocator)
+    IHalBufferAllocator* placeholder_buffer_allocator)
     : cache_info_(reg_info) {
   std::lock_guard<std::mutex> lock(cache_access_mutex_);
   notify_for_workload_ = notify;
-  dummy_buffer_allocator_ = dummy_buffer_allocator;
+  placeholder_buffer_allocator_ = placeholder_buffer_allocator;
 }
 
 status_t StreamBufferCacheManager::StreamBufferCache::UpdateCache(
@@ -377,14 +377,14 @@ status_t StreamBufferCacheManager::StreamBufferCache::GetBuffer(
 
   // 1. check if the cache is deactived
   if (stream_deactived_) {
-    res->is_dummy_buffer = true;
-    res->buffer = dummy_buffer_;
+    res->is_placeholder_buffer = true;
+    res->buffer = placeholder_buffer_;
     return OK;
   }
 
   // 2. check if there is any buffer available in the cache. If not, try
   // to wait for a short period and check again. In case of timeout, use the
-  // dummy buffer instead.
+  // placeholder buffer instead.
   if (cached_buffers_.empty()) {
     // In case the GetStreamBufer is called after NotifyFlushingAll, this will
     // be the first event that should trigger the dedicated thread to restart
@@ -405,21 +405,21 @@ status_t StreamBufferCacheManager::StreamBufferCache::GetBuffer(
     }
   }
 
-  // 3. use dummy buffer if the cache is still empty
+  // 3. use placeholder buffer if the cache is still empty
   if (cached_buffers_.empty()) {
-    // Only allocate dummy buffer for the first time
-    if (dummy_buffer_.buffer == nullptr) {
-      status_t result = AllocateDummyBufferLocked();
+    // Only allocate placeholder buffer for the first time
+    if (placeholder_buffer_.buffer == nullptr) {
+      status_t result = AllocatePlaceholderBufferLocked();
       if (result != OK) {
-        ALOGE("%s: Allocate dummy buffer failed.", __FUNCTION__);
+        ALOGE("%s: Allocate placeholder buffer failed.", __FUNCTION__);
         return UNKNOWN_ERROR;
       }
     }
-    res->is_dummy_buffer = true;
-    res->buffer = dummy_buffer_;
+    res->is_placeholder_buffer = true;
+    res->buffer = placeholder_buffer_;
     return OK;
   } else {
-    res->is_dummy_buffer = false;
+    res->is_placeholder_buffer = false;
     res->buffer = cached_buffers_.back();
     cached_buffers_.pop_back();
   }
@@ -452,7 +452,7 @@ status_t StreamBufferCacheManager::StreamBufferCache::FlushLocked(
 
   if (cached_buffers_.empty()) {
     ALOGV("%s: Stream buffer cache is already empty.", __FUNCTION__);
-    ReleaseDummyBufferLocked();
+    ReleasePlaceholderBufferLocked();
     return OK;
   }
 
@@ -463,7 +463,7 @@ status_t StreamBufferCacheManager::StreamBufferCache::FlushLocked(
   }
 
   cached_buffers_.clear();
-  ReleaseDummyBufferLocked();
+  ReleasePlaceholderBufferLocked();
 
   return OK;
 }
@@ -497,9 +497,9 @@ status_t StreamBufferCacheManager::StreamBufferCache::Refill() {
   }
 
   // Requesting buffer from the provider can take long(e.g. even > 1sec),
-  // consumer should not be blocked by this procedure and can get dummy buffer
-  // to unblock other pipelines. Thus, cache_access_mutex_ doesn't need to be
-  // locked here.
+  // consumer should not be blocked by this procedure and can get placeholder
+  // buffer to unblock other pipelines. Thus, cache_access_mutex_ doesn't need
+  // to be locked here.
   std::vector<StreamBuffer> buffers;
   StreamBufferRequestError req_status = StreamBufferRequestError::kOk;
   status_t res =
@@ -507,9 +507,9 @@ status_t StreamBufferCacheManager::StreamBufferCache::Refill() {
 
   std::unique_lock<std::mutex> cache_lock(cache_access_mutex_);
   if (res != OK) {
-    status_t result = AllocateDummyBufferLocked();
+    status_t result = AllocatePlaceholderBufferLocked();
     if (result != OK) {
-      ALOGE("%s: Allocate dummy buffer failed.", __FUNCTION__);
+      ALOGE("%s: Allocate placeholder buffer failed.", __FUNCTION__);
       return UNKNOWN_ERROR;
     }
   }
@@ -531,7 +531,7 @@ status_t StreamBufferCacheManager::StreamBufferCache::Refill() {
             "%s: Stream %d is disconnected or unknown error observed."
             "This stream is marked as inactive.",
             __FUNCTION__, cache_info_.stream_id);
-        ALOGI("%s: Stream %d begin to use dummy buffer.", __FUNCTION__,
+        ALOGI("%s: Stream %d begin to use placeholder buffer.", __FUNCTION__,
               cache_info_.stream_id);
         stream_deactived_ = true;
         break;
@@ -560,9 +560,10 @@ bool StreamBufferCacheManager::StreamBufferCache::RefillableLocked() const {
   return cached_buffers_.size() < cache_info_.num_buffers_to_cache;
 }
 
-status_t StreamBufferCacheManager::StreamBufferCache::AllocateDummyBufferLocked() {
-  if (dummy_buffer_.buffer != nullptr) {
-    ALOGW("%s: Dummy buffer has already been allocated.", __FUNCTION__);
+status_t
+StreamBufferCacheManager::StreamBufferCache::AllocatePlaceholderBufferLocked() {
+  if (placeholder_buffer_.buffer != nullptr) {
+    ALOGW("%s: placeholder buffer has already been allocated.", __FUNCTION__);
     return OK;
   }
 
@@ -578,10 +579,11 @@ status_t StreamBufferCacheManager::StreamBufferCache::AllocateDummyBufferLocked(
   };
   std::vector<buffer_handle_t> buffers;
 
-  status_t res =
-      dummy_buffer_allocator_->AllocateBuffers(hal_buffer_descriptor, &buffers);
+  status_t res = placeholder_buffer_allocator_->AllocateBuffers(
+      hal_buffer_descriptor, &buffers);
   if (res != OK) {
-    ALOGE("%s: Dummy buffer allocator AllocateBuffers failed.", __FUNCTION__);
+    ALOGE("%s: placeholder buffer allocator AllocateBuffers failed.",
+          __FUNCTION__);
     return res;
   }
 
@@ -589,20 +591,20 @@ status_t StreamBufferCacheManager::StreamBufferCache::AllocateDummyBufferLocked(
     ALOGE("%s: Not enough buffers allocated.", __FUNCTION__);
     return NO_MEMORY;
   }
-  dummy_buffer_.stream_id = cache_info_.stream_id;
-  dummy_buffer_.buffer = buffers[0];
-  ALOGI("%s: [sbc] Dummy buffer allocated: strm %d buffer %p", __FUNCTION__,
-        dummy_buffer_.stream_id, dummy_buffer_.buffer);
+  placeholder_buffer_.stream_id = cache_info_.stream_id;
+  placeholder_buffer_.buffer = buffers[0];
+  ALOGI("%s: [sbc] placeholder buffer allocated: strm %d buffer %p",
+        __FUNCTION__, placeholder_buffer_.stream_id, placeholder_buffer_.buffer);
 
   return OK;
 }
 
-void StreamBufferCacheManager::StreamBufferCache::ReleaseDummyBufferLocked() {
-  // Release dummy buffer if ever acquired from the dummy_buffer_allocator_.
-  if (dummy_buffer_.buffer != nullptr) {
-    std::vector<buffer_handle_t> buffers(1, dummy_buffer_.buffer);
-    dummy_buffer_allocator_->FreeBuffers(&buffers);
-    dummy_buffer_.buffer = nullptr;
+void StreamBufferCacheManager::StreamBufferCache::ReleasePlaceholderBufferLocked() {
+  // Release placeholder buffer if ever acquired from the placeholder_buffer_allocator_.
+  if (placeholder_buffer_.buffer != nullptr) {
+    std::vector<buffer_handle_t> buffers(1, placeholder_buffer_.buffer);
+    placeholder_buffer_allocator_->FreeBuffers(&buffers);
+    placeholder_buffer_.buffer = nullptr;
   }
 }
 

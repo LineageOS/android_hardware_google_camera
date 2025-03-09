@@ -162,6 +162,7 @@ static void LoadLibraries(google_camera_hal::HwlMemoryConfig memory_config,
     return true;
   };
   ProcMemInfo meminfo(getpid());
+  // TODO(b/376519437) - Restrict madvising to important VMAs.
   meminfo.ForEachVmaFromMaps(vmaCollectorCb);
 }
 

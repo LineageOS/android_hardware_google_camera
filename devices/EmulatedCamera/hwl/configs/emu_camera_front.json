@@ -5,6 +5,16 @@
    "1",
    "2"
   ],
+  "android.colorCorrection.availableModes": [
+    "0",
+    "1",
+    "2",
+    "3"
+   ],
+   "android.colorCorrection.colorTemperatureRange": [
+    "2000",
+    "10000"
+   ],
   "android.control.aeAvailableAntibandingModes": [
    "0",
    "1",
@@ -1523,6 +1533,16 @@
    "1",
    "2"
   ],
+  "android.colorCorrection.availableModes": [
+    "0",
+    "1",
+    "2",
+    "3"
+   ],
+   "android.colorCorrection.colorTemperatureRange": [
+    "2000",
+    "10000"
+   ],
   "android.control.aeAvailableAntibandingModes": [
    "0",
    "1",
@@ -3006,6 +3026,16 @@
    "1",
    "2"
   ],
+  "android.colorCorrection.availableModes": [
+    "0",
+    "1",
+    "2",
+    "3"
+   ],
+   "android.colorCorrection.colorTemperatureRange": [
+    "2000",
+    "10000"
+   ],
   "android.control.aeAvailableAntibandingModes": [
    "0",
    "1",

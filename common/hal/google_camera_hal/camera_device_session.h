@@ -255,10 +255,11 @@ class CameraDeviceSession {
   void NotifyBufferError(uint32_t frame_number, int32_t stream_id,
                          uint64_t buffer_id);
 
-  // Try to check if result contains dummy buffer or dummy buffer from this
-  // result has been observed. If so, handle this result specifically. Set
-  // result_handled as true.
-  status_t TryHandleDummyResult(CaptureResult* result, bool* result_handled);
+  // Try to check if result contains placeholder buffer or placeholder buffer
+  // from this result has been observed. If so, handle this result specifically.
+  // Set result_handled as true.
+  status_t TryHandlePlaceholderResult(CaptureResult* result,
+                                      bool* result_handled);
 
   // Check if all streams in the current session are active in SBC manager
   status_t HandleSBCInactiveStreams(const CaptureRequest& request,
@@ -415,8 +416,8 @@ class CameraDeviceSession {
   // Protected by request_record_lock_;
   std::set<uint32_t> error_notified_requests_;
 
-  // Set of dummy buffer observed
-  std::set<buffer_handle_t> dummy_buffer_observed_;
+  // Set of placeholder buffer observed
+  std::set<buffer_handle_t> placeholder_buffer_observed_;
 
   // The last shutter timestamp in nanoseconds if systrace is enabled. Reset
   // after stream configuration.

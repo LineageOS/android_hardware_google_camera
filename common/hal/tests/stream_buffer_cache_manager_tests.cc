@@ -68,7 +68,7 @@ class StreamBufferCacheManagerTests : public ::testing::Test {
     return OK;
   }
 
-  const StreamBufferCacheRegInfo kDummyCacheRegInfo{
+  const StreamBufferCacheRegInfo kTestCacheRegInfo{
       .request_func =
           [this](uint32_t num_buffer, std::vector<StreamBuffer>* buffers,
                  StreamBufferRequestError* status) {
@@ -100,7 +100,7 @@ class StreamBufferCacheManagerTests : public ::testing::Test {
     if (!product_support_test) {
       GTEST_SKIP();
     }
-    hal_buffer_managed_stream_ids_.insert(kDummyCacheRegInfo.stream_id);
+    hal_buffer_managed_stream_ids_.insert(kTestCacheRegInfo.stream_id);
     cache_manager_ =
         StreamBufferCacheManager::Create(hal_buffer_managed_stream_ids_);
     ASSERT_NE(cache_manager_, nullptr)
@@ -136,17 +136,17 @@ class StreamBufferCacheManagerTests : public ::testing::Test {
 // Test RegisterStream
 TEST_F(StreamBufferCacheManagerTests, RegisterStream) {
   // RegisterStream should succeed
-  status_t res = cache_manager_->RegisterStream(kDummyCacheRegInfo);
+  status_t res = cache_manager_->RegisterStream(kTestCacheRegInfo);
   ASSERT_EQ(res, OK) << " RegisterStream failed!" << strerror(res);
 
   // RegisterStream should fail when registering the same stream twice
-  res = cache_manager_->RegisterStream(kDummyCacheRegInfo);
+  res = cache_manager_->RegisterStream(kTestCacheRegInfo);
   ASSERT_NE(res, OK) << " RegisterStream succeeded when registering the same "
                         "stream for more than once!";
 
   // RegisterStream should succeed when registering another stream
-  StreamBufferCacheRegInfo another_reg_info = kDummyCacheRegInfo;
-  another_reg_info.stream_id = kDummyCacheRegInfo.stream_id + 1;
+  StreamBufferCacheRegInfo another_reg_info = kTestCacheRegInfo;
+  another_reg_info.stream_id = kTestCacheRegInfo.stream_id + 1;
   res = cache_manager_->RegisterStream(another_reg_info);
   ASSERT_EQ(res, OK) << " RegisterStream another stream failed!"
                      << strerror(res);
@@ -156,15 +156,15 @@ TEST_F(StreamBufferCacheManagerTests, RegisterStream) {
 TEST_F(StreamBufferCacheManagerTests, NotifyProviderReadiness) {
   // Need to register stream before notifying provider readiness
   status_t res =
-      cache_manager_->NotifyProviderReadiness(kDummyCacheRegInfo.stream_id);
+      cache_manager_->NotifyProviderReadiness(kTestCacheRegInfo.stream_id);
   ASSERT_NE(res, OK) << " NotifyProviderReadiness succeeded without reigstering"
                         " the stream.";
 
-  res = cache_manager_->RegisterStream(kDummyCacheRegInfo);
+  res = cache_manager_->RegisterStream(kTestCacheRegInfo);
   ASSERT_EQ(res, OK) << " RegisterStream failed!" << strerror(res);
 
   // Notify ProviderReadiness should succeed after the stream is registered
-  res = cache_manager_->NotifyProviderReadiness(kDummyCacheRegInfo.stream_id);
+  res = cache_manager_->NotifyProviderReadiness(kTestCacheRegInfo.stream_id);
   ASSERT_EQ(res, OK) << " NotifyProviderReadiness failed!" << strerror(res);
 }
 
@@ -172,28 +172,28 @@ TEST_F(StreamBufferCacheManagerTests, NotifyProviderReadiness) {
 TEST_F(StreamBufferCacheManagerTests, BasicGetStreamBuffer) {
   StreamBufferRequestResult req_result;
   // GetStreamBuffer should fail before the stream is registered.
-  status_t res = cache_manager_->GetStreamBuffer(kDummyCacheRegInfo.stream_id,
-                                                 &req_result);
+  status_t res =
+      cache_manager_->GetStreamBuffer(kTestCacheRegInfo.stream_id, &req_result);
   ASSERT_NE(res, OK) << " GetStreamBuffer should fail before stream is "
                         "registered and provider readiness is notified.";
 
-  res = cache_manager_->RegisterStream(kDummyCacheRegInfo);
+  res = cache_manager_->RegisterStream(kTestCacheRegInfo);
   ASSERT_EQ(res, OK) << " RegisterStream failed!" << strerror(res);
 
   // GetStreamBuffer should fail before the stream's provider is notified for
   // readiness.
-  res = cache_manager_->GetStreamBuffer(kDummyCacheRegInfo.stream_id,
-                                        &req_result);
+  res =
+      cache_manager_->GetStreamBuffer(kTestCacheRegInfo.stream_id, &req_result);
   ASSERT_NE(res, OK) << " GetStreamBuffer should fail before stream is "
                         "registered and provider readiness is notified.";
 
-  res = cache_manager_->NotifyProviderReadiness(kDummyCacheRegInfo.stream_id);
+  res = cache_manager_->NotifyProviderReadiness(kTestCacheRegInfo.stream_id);
   ASSERT_EQ(res, OK) << " NotifyProviderReadiness failed!" << strerror(res);
 
   // GetStreamBuffer should succeed after the stream is registered and its
   // provider's readiness is notified.
-  res = cache_manager_->GetStreamBuffer(kDummyCacheRegInfo.stream_id,
-                                        &req_result);
+  res =
+      cache_manager_->GetStreamBuffer(kTestCacheRegInfo.stream_id, &req_result);
   ASSERT_EQ(res, OK) << " Getting stream buffer failed!" << strerror(res);
 }
 
@@ -201,59 +201,60 @@ TEST_F(StreamBufferCacheManagerTests, BasicGetStreamBuffer) {
 TEST_F(StreamBufferCacheManagerTests, SequenceOfGetStreamBuffer) {
   const uint32_t kValidBufferRequests = 2;
   SetRemainingFulfillment(kValidBufferRequests);
-  status_t res = cache_manager_->RegisterStream(kDummyCacheRegInfo);
+  status_t res = cache_manager_->RegisterStream(kTestCacheRegInfo);
   ASSERT_EQ(res, OK) << " RegisterStream failed!" << strerror(res);
 
-  res = cache_manager_->NotifyProviderReadiness(kDummyCacheRegInfo.stream_id);
+  res = cache_manager_->NotifyProviderReadiness(kTestCacheRegInfo.stream_id);
   ASSERT_EQ(res, OK) << " NotifyProviderReadiness failed!" << strerror(res);
 
   // Allow enough time for the buffer allocator to refill the cache
   std::this_thread::sleep_for(kAllocateBufferFuncLatency);
 
-  // First GetStreamBuffer should succeed immediately with a non-dummy buffer
+  // First GetStreamBuffer should succeed immediately with a non-placeholder buffer
   StreamBufferRequestResult req_result;
   auto t_start = std::chrono::high_resolution_clock::now();
-  res = cache_manager_->GetStreamBuffer(kDummyCacheRegInfo.stream_id,
-                                        &req_result);
+  res =
+      cache_manager_->GetStreamBuffer(kTestCacheRegInfo.stream_id, &req_result);
   auto t_end = std::chrono::high_resolution_clock::now();
   ASSERT_EQ(res, OK) << " GetStreamBuffer failed!" << strerror(res);
   ASSERT_EQ(true, t_end - t_start < kBufferAcquireMinLatency)
       << " First buffer request should be fulfilled immediately.";
-  ASSERT_EQ(req_result.is_dummy_buffer, false)
-      << " First buffer request got dummy buffer.";
+  ASSERT_EQ(req_result.is_placeholder_buffer, false)
+      << " First buffer request got placeholder buffer.";
 
-  // Second GetStreamBuffer should succeed with a non-dummy buffer, but should
-  // happen after a gap longer than kBufferAcquireMinLatency.
+  // Second GetStreamBuffer should succeed with a non-placeholder buffer, but
+  // should happen after a gap longer than kBufferAcquireMinLatency.
   t_start = std::chrono::high_resolution_clock::now();
-  res = cache_manager_->GetStreamBuffer(kDummyCacheRegInfo.stream_id,
-                                        &req_result);
+  res =
+      cache_manager_->GetStreamBuffer(kTestCacheRegInfo.stream_id, &req_result);
   t_end = std::chrono::high_resolution_clock::now();
   ASSERT_EQ(res, OK) << " GetStreamBuffer failed!" << strerror(res);
   ASSERT_EQ(true, t_end - t_start > kBufferAcquireMinLatency)
       << " Buffer acquisition gap between two consecutive reqs is too small.";
-  ASSERT_EQ(req_result.is_dummy_buffer, false)
-      << " Second buffer request got dummy buffer.";
+  ASSERT_EQ(req_result.is_placeholder_buffer, false)
+      << " Second buffer request got placeholder buffer.";
 
   // Allow enough time for the buffer allocator to refill the cache
   std::this_thread::sleep_for(kAllocateBufferFuncLatency);
   // No more remaining fulfilment so StreamBufferCache should be either deactive
   // or inactive.
   bool is_active = false;
-  res = cache_manager_->IsStreamActive(kDummyCacheRegInfo.stream_id, &is_active);
+  res = cache_manager_->IsStreamActive(kTestCacheRegInfo.stream_id, &is_active);
   ASSERT_EQ(res, OK) << " IsStreamActive failed!" << strerror(res);
   ASSERT_EQ(is_active, false)
       << " StreamBufferCache should be either deactive or inactive!";
 
-  // Third GetStreamBuffer should succeed with a dummy buffer immediately
+  // Third GetStreamBuffer should succeed with a placeholder buffer immediately
   t_start = std::chrono::high_resolution_clock::now();
-  res = cache_manager_->GetStreamBuffer(kDummyCacheRegInfo.stream_id,
-                                        &req_result);
+  res =
+      cache_manager_->GetStreamBuffer(kTestCacheRegInfo.stream_id, &req_result);
   t_end = std::chrono::high_resolution_clock::now();
   ASSERT_EQ(res, OK) << " GetStreamBuffer failed!" << strerror(res);
   ASSERT_EQ(true, t_end - t_start < kBufferAcquireMinLatency)
-      << " Buffer acquisition gap for a dummy return should be negligible.";
-  ASSERT_EQ(req_result.is_dummy_buffer, true)
-      << " Third buffer request did not get dummy buffer.";
+      << " Buffer acquisition gap for a placeholder return should be "
+         "negligible.";
+  ASSERT_EQ(req_result.is_placeholder_buffer, true)
+      << " Third buffer request did not get placeholder buffer.";
 }
 
 // Test NotifyFlushingAll
@@ -262,26 +263,26 @@ TEST_F(StreamBufferCacheManagerTests, NotifyFlushingAll) {
   // GetStreamBuffer happens after the NotifyFlushingAll.
   const uint32_t kValidBufferRequests = 3;
   SetRemainingFulfillment(kValidBufferRequests);
-  status_t res = cache_manager_->RegisterStream(kDummyCacheRegInfo);
+  status_t res = cache_manager_->RegisterStream(kTestCacheRegInfo);
   ASSERT_EQ(res, OK) << " RegisterStream failed!" << strerror(res);
 
-  res = cache_manager_->NotifyProviderReadiness(kDummyCacheRegInfo.stream_id);
+  res = cache_manager_->NotifyProviderReadiness(kTestCacheRegInfo.stream_id);
   ASSERT_EQ(res, OK) << " NotifyProviderReadiness failed!" << strerror(res);
 
   // Allow enough time for the buffer allocator to refill the cache
   std::this_thread::sleep_for(kAllocateBufferFuncLatency);
 
-  // First GetStreamBuffer should succeed immediately with a non-dummy buffer
+  // First GetStreamBuffer should succeed immediately with a non-placeholder buffer
   StreamBufferRequestResult req_result;
   auto t_start = std::chrono::high_resolution_clock::now();
-  res = cache_manager_->GetStreamBuffer(kDummyCacheRegInfo.stream_id,
-                                        &req_result);
+  res =
+      cache_manager_->GetStreamBuffer(kTestCacheRegInfo.stream_id, &req_result);
   auto t_end = std::chrono::high_resolution_clock::now();
   ASSERT_EQ(res, OK) << " GetStreamBuffer failed!" << strerror(res);
   ASSERT_EQ(true, t_end - t_start < kBufferAcquireMinLatency)
       << " First buffer request should be fulfilled immediately.";
-  ASSERT_EQ(req_result.is_dummy_buffer, false)
-      << " First buffer request got dummy buffer.";
+  ASSERT_EQ(req_result.is_placeholder_buffer, false)
+      << " First buffer request got placeholder buffer.";
 
   // Allow enough time for the buffer allocator to refill the cache
   std::this_thread::sleep_for(kAllocateBufferFuncLatency);
@@ -296,41 +297,41 @@ TEST_F(StreamBufferCacheManagerTests, NotifyFlushingAll) {
 
   // GetStreamBuffer should still be able to re-trigger cache to refill after
   // NotifyFlushingAll is called.
-  res = cache_manager_->GetStreamBuffer(kDummyCacheRegInfo.stream_id,
-                                        &req_result);
+  res =
+      cache_manager_->GetStreamBuffer(kTestCacheRegInfo.stream_id, &req_result);
   ASSERT_EQ(res, OK) << " GetStreamBuffer failed!" << strerror(res);
-  ASSERT_EQ(req_result.is_dummy_buffer, false)
-      << " Buffer request got dummy buffer.";
+  ASSERT_EQ(req_result.is_placeholder_buffer, false)
+      << " Buffer request got placeholder buffer.";
 }
 
 // Test IsStreamActive
 TEST_F(StreamBufferCacheManagerTests, IsStreamActive) {
   const uint32_t kValidBufferRequests = 1;
   SetRemainingFulfillment(kValidBufferRequests);
-  status_t res = cache_manager_->RegisterStream(kDummyCacheRegInfo);
+  status_t res = cache_manager_->RegisterStream(kTestCacheRegInfo);
   ASSERT_EQ(res, OK) << " RegisterStream failed!" << strerror(res);
 
-  res = cache_manager_->NotifyProviderReadiness(kDummyCacheRegInfo.stream_id);
+  res = cache_manager_->NotifyProviderReadiness(kTestCacheRegInfo.stream_id);
   ASSERT_EQ(res, OK) << " NotifyProviderReadiness failed!" << strerror(res);
 
   // Allow enough time for the buffer allocator to refill the cache
   std::this_thread::sleep_for(kAllocateBufferFuncLatency);
 
-  // StreamBufferCache should be valid before dummy buffer is used.
+  // StreamBufferCache should be valid before placeholder buffer is used.
   bool is_active = false;
-  res = cache_manager_->IsStreamActive(kDummyCacheRegInfo.stream_id, &is_active);
+  res = cache_manager_->IsStreamActive(kTestCacheRegInfo.stream_id, &is_active);
   ASSERT_EQ(res, OK) << " IsStreamActive failed!" << strerror(res);
   ASSERT_EQ(is_active, true) << " StreamBufferCache should be active!";
 
   StreamBufferRequestResult req_result;
-  res = cache_manager_->GetStreamBuffer(kDummyCacheRegInfo.stream_id,
-                                        &req_result);
+  res =
+      cache_manager_->GetStreamBuffer(kTestCacheRegInfo.stream_id, &req_result);
 
   // Allow enough time for buffer provider to finish its job
   std::this_thread::sleep_for(kAllocateBufferFuncLatency);
   // There is only one valid buffer request. So the stream will be deactive
   // after the GetStreamBuffer(when the cache tries the second buffer request).
-  res = cache_manager_->IsStreamActive(kDummyCacheRegInfo.stream_id, &is_active);
+  res = cache_manager_->IsStreamActive(kTestCacheRegInfo.stream_id, &is_active);
   ASSERT_EQ(res, OK) << " IsStreamActive failed!" << strerror(res);
   ASSERT_EQ(is_active, false) << " StreamBufferCache should be deactived!";
 }

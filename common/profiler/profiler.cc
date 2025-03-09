@@ -608,11 +608,11 @@ class ProfilerStopwatchImpl : public ProfilerImpl {
   }
 };
 
-// Dummpy profiler class.
-class ProfilerDummy : public Profiler {
+// Empty profiler class.
+class ProfilerNoop : public Profiler {
  public:
-  ProfilerDummy(){};
-  ~ProfilerDummy(){};
+  ProfilerNoop() {};
+  ~ProfilerNoop() {};
 
   void SetUseCase(std::string) override final{};
   void SetDumpFilePrefix(const std::string&) override final{};
@@ -635,7 +635,7 @@ std::shared_ptr<Profiler> Profiler::Create(int option) {
   SetPropFlag flag = static_cast<SetPropFlag>(option);
 
   if (flag == SetPropFlag::kDisable) {
-    return std::make_shared<ProfilerDummy>();
+    return std::make_shared<ProfilerNoop>();
   } else if (flag & SetPropFlag::kStopWatch) {
     return std::make_shared<ProfilerStopwatchImpl>(flag);
   } else {

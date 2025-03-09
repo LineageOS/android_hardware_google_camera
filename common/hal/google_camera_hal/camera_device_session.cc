@@ -811,7 +811,7 @@ status_t CameraDeviceSession::ConfigureStreams(
     std::lock_guard<std::mutex> request_lock(request_record_lock_);
     pending_request_streams_.clear();
     error_notified_requests_.clear();
-    dummy_buffer_observed_.clear();
+    placeholder_buffer_observed_.clear();
     pending_results_.clear();
     ignore_shutters_.clear();
   }
@@ -1035,8 +1035,8 @@ void CameraDeviceSession::NotifyErrorMessage(uint32_t frame_number,
   session_callback_.notify(message);
 }
 
-status_t CameraDeviceSession::TryHandleDummyResult(CaptureResult* result,
-                                                   bool* result_handled) {
+status_t CameraDeviceSession::TryHandlePlaceholderResult(CaptureResult* result,
+                                                         bool* result_handled) {
   if (result == nullptr || result_handled == nullptr) {
     ALOGE("%s: result or result_handled is nullptr.", __FUNCTION__);
     return BAD_VALUE;
@@ -1051,8 +1051,8 @@ status_t CameraDeviceSession::TryHandleDummyResult(CaptureResult* result,
     if (error_notified_requests_.find(frame_number) ==
         error_notified_requests_.end()) {
       for (auto& stream_buffer : result->output_buffers) {
-        if (dummy_buffer_observed_.find(stream_buffer.buffer) !=
-            dummy_buffer_observed_.end()) {
+        if (placeholder_buffer_observed_.find(stream_buffer.buffer) !=
+            placeholder_buffer_observed_.end()) {
           error_notified_requests_.insert(frame_number);
           if (pending_results_.find(frame_number) != pending_results_.end()) {
             need_to_notify_error_result = true;
@@ -1076,7 +1076,7 @@ status_t CameraDeviceSession::TryHandleDummyResult(CaptureResult* result,
 
   if (need_to_handle_result) {
     for (auto& stream_buffer : result->output_buffers) {
-      bool is_dummy_buffer = false;
+      bool is_placeholder_buffer = false;
       if (hal_buffer_managed_stream_ids_.find(stream_buffer.stream_id) ==
           hal_buffer_managed_stream_ids_.end()) {
         // No need to handle non HAL buffer managed streams here
@@ -1084,12 +1084,14 @@ status_t CameraDeviceSession::TryHandleDummyResult(CaptureResult* result,
       }
       {
         std::lock_guard<std::mutex> lock(request_record_lock_);
-        is_dummy_buffer = (dummy_buffer_observed_.find(stream_buffer.buffer) !=
-                           dummy_buffer_observed_.end());
+        is_placeholder_buffer =
+            (placeholder_buffer_observed_.find(stream_buffer.buffer) !=
+             placeholder_buffer_observed_.end());
       }
 
-      uint64_t buffer_id = (is_dummy_buffer ? /*Use invalid for dummy*/ 0
-                                            : stream_buffer.buffer_id);
+      uint64_t buffer_id =
+          (is_placeholder_buffer ? /*Use invalid for placeholder*/ 0
+                                 : stream_buffer.buffer_id);
       // To avoid publishing duplicated error buffer message, only publish
       // it here when getting normal buffer status from HWL
       if (stream_buffer.status == BufferStatus::kOk) {
@@ -1117,8 +1119,8 @@ status_t CameraDeviceSession::TryHandleDummyResult(CaptureResult* result,
             // requests tracker
             continue;
           }
-          if (dummy_buffer_observed_.find(buffer.buffer) ==
-              dummy_buffer_observed_.end()) {
+          if (placeholder_buffer_observed_.find(buffer.buffer) ==
+              placeholder_buffer_observed_.end()) {
             acquired_buffers.push_back(buffer);
           }
         }
@@ -1798,27 +1800,28 @@ status_t CameraDeviceSession::RequestBuffersFromStreamBufferCacheManager(
 
   // This function fulfills requests from lower HAL level. It is hard for some
   // implementation of lower HAL level to handle the case of a request failure.
-  // In case a framework buffer can not be delivered to the lower level, a dummy
-  // buffer will be returned by the stream buffer cache manager.
-  // The client at lower level can use that dummy buffer as a normal buffer for
-  // writing and so forth. But that buffer will not be returned to the
+  // In case a framework buffer can not be delivered to the lower level, a
+  // placeholder buffer will be returned by the stream buffer cache manager. The
+  // client at lower level can use that placeholder buffer as a normal buffer
+  // for writing and so forth. But that buffer will not be returned to the
   // framework. This avoids the troublesome for lower level to handle such
   // situation. An ERROR_REQUEST needs to be returned to the framework according
-  // to ::android::hardware::camera::device::V3_5::StreamBufferRequestError.
-  if (buffer_request_result.is_dummy_buffer) {
-    ALOGI("%s: [sbc] Dummy buffer returned for stream: %d, frame: %d",
+  // to
+  // ::android::hardware::camera::device::V3_5::StreamBufferRequestError.
+  if (buffer_request_result.is_placeholder_buffer) {
+    ALOGI("%s: [sbc] Placeholder buffer returned for stream: %d, frame: %d",
           __FUNCTION__, stream_id, frame_number);
     {
       std::lock_guard<std::mutex> lock(request_record_lock_);
-      dummy_buffer_observed_.insert(buffer_request_result.buffer.buffer);
+      placeholder_buffer_observed_.insert(buffer_request_result.buffer.buffer);
     }
   }
 
   ALOGV("%s: [sbc] => HWL Acquired buf[%p] buf_id[%" PRIu64
-        "] strm[%d] frm[%u] dummy[%d]",
+        "] strm[%d] frm[%u] placeholder[%d]",
         __FUNCTION__, buffer_request_result.buffer.buffer,
         buffer_request_result.buffer.buffer_id, stream_id, frame_number,
-        buffer_request_result.is_dummy_buffer);
+        buffer_request_result.is_placeholder_buffer);
 
   buffers->push_back(buffer_request_result.buffer);
   return OK;
@@ -1980,7 +1983,7 @@ bool CameraDeviceSession::TryHandleCaptureResult(
   // If there is placeholder buffer or a placeholder buffer has been observed of
   // this frame, handle the capture result specifically.
   bool result_handled = false;
-  res = TryHandleDummyResult(result.get(), &result_handled);
+  res = TryHandlePlaceholderResult(result.get(), &result_handled);
   if (res != OK) {
     ALOGE("%s: Failed to handle placeholder result.", __FUNCTION__);
     return true;
