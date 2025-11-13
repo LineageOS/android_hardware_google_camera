@@ -1771,7 +1771,8 @@ status_t CameraDeviceSession::RegisterStreamsIntoCacheManagerLocked(
         .format = stream_format,
         .producer_flags = producer_usage,
         .consumer_flags = consumer_usage,
-        .num_buffers_to_cache = num_buffers_to_cache};
+        .num_buffers_to_cache = num_buffers_to_cache,
+        .group_id = stream.group_id};
 
     status_t res = stream_buffer_cache_manager_->RegisterStream(reg_info);
     if (res != OK) {

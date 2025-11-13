@@ -147,6 +147,7 @@ void ApexUpdateListener::ThreadFunction() {
   // Maximum number of events to read at a time
   constexpr int event_number = 16;
   std::vector<struct inotify_event> events(event_number);
+  pthread_setname_np(pthread_self(), "ApexListener");
   do {
     auto length = read(file_descriptor_, events.data(),
                        event_number * sizeof(inotify_event));

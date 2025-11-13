@@ -15,12 +15,11 @@
  */
 
 #define LOG_TAG "InternalStreamManagerTests"
-#include <log/log.h>
-
 #include <gtest/gtest.h>
 #include <hal_types.h>
 #include <hardware/gralloc.h>
 #include <internal_stream_manager.h>
+#include <log/log.h>
 
 namespace android {
 namespace google_camera_hal {
@@ -51,7 +50,7 @@ static constexpr Stream kVideoStreamTemplate{
 // Raw stream template used in the test.
 static constexpr Stream kRawStreamTemplate{
     .stream_type = StreamType::kOutput,
-    .width = 4022,
+    .width = 4032,
     .height = 3024,
     .format = HAL_PIXEL_FORMAT_RAW10,
     .usage = 0,
@@ -60,14 +59,14 @@ static constexpr Stream kRawStreamTemplate{
 
 // Preview HAL stream template used in the test.
 static constexpr HalStream kPreviewHalStreamTemplate{
-    .override_format = HAL_PIXEL_FORMAT_YV12,
+    .override_format = HAL_PIXEL_FORMAT_YCBCR_420_888,
     .producer_usage = GRALLOC_USAGE_HW_CAMERA_WRITE,
     .max_buffers = 4,
 };
 
 // Video HAL stream template used in the test.
 static constexpr HalStream kVideoHalStreamTemplate{
-    .override_format = HAL_PIXEL_FORMAT_YV12,
+    .override_format = HAL_PIXEL_FORMAT_YCBCR_420_888,
     .producer_usage = GRALLOC_USAGE_HW_CAMERA_WRITE,
     .max_buffers = 4,
 };

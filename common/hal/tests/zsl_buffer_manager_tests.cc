@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
+#include "hardware/gralloc1.h"
 #define LOG_TAG "ZslBufferManagerTests"
-#include <log/log.h>
-
 #include <gtest/gtest.h>
+#include <log/log.h>
 #include <zsl_buffer_manager.h>
 
 namespace android {
@@ -31,6 +31,8 @@ static constexpr HalBufferDescriptor kRawBufferDescriptor = {
     .width = 4032,
     .height = 3024,
     .format = HAL_PIXEL_FORMAT_RAW10,
+    .producer_flags = GRALLOC1_PRODUCER_USAGE_CAMERA,
+    .consumer_flags = GRALLOC1_CONSUMER_USAGE_CAMERA,
     .immediate_num_buffers = kMaxBufferDepth,
     .max_num_buffers = kMaxBufferDepth,
 };

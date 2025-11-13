@@ -23,7 +23,6 @@ prebuilt_defaults {
     name: "emu_camera_config_defaults",
     relative_install_path: "config",
     soc_specific: true,
-    installable: false,
 }
 
 prebuilt_etc {

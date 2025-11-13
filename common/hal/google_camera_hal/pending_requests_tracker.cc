@@ -22,8 +22,6 @@
 #include <log/log.h>
 #include <utils/Trace.h>
 
-#include "libgooglecamerahal_flags.h"
-
 namespace android {
 namespace google_camera_hal {
 
@@ -286,20 +284,9 @@ status_t PendingRequestsTracker::WaitAndTrackRequestBuffers(
   }
 
   std::unique_lock<std::mutex> lock(pending_requests_mutex_);
-  if (libgooglecamerahal::flags::disable_capture_request_timeout()) {
-    tracker_request_condition_.wait(lock, [this, &request] {
-      return DoStreamsHaveEnoughBuffersLocked(request.output_buffers);
-    });
-  } else {
-    constexpr uint32_t kTrackerTimeoutMs = 3000;
-    if (!tracker_request_condition_.wait_for(
-            lock, std::chrono::milliseconds(kTrackerTimeoutMs), [this, &request] {
-              return DoStreamsHaveEnoughBuffersLocked(request.output_buffers);
-            })) {
-      ALOGE("%s: Waiting for buffer ready timed out.", __FUNCTION__);
-      return TIMED_OUT;
-    }
-  }
+  tracker_request_condition_.wait(lock, [this, &request] {
+    return DoStreamsHaveEnoughBuffersLocked(request.output_buffers);
+  });
 
   ALOGV("%s: all streams are ready", __FUNCTION__);
 

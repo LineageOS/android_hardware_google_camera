@@ -44,7 +44,7 @@ CameraProvider::~CameraProvider() {
 
 std::unique_ptr<CameraProvider> CameraProvider::Create(
     std::unique_ptr<CameraProviderHwl> camera_provider_hwl) {
-  ATRACE_CALL();
+  ATRACE_NAME("CameraProvider::Create");
   auto provider = std::unique_ptr<CameraProvider>(new CameraProvider());
   if (provider == nullptr) {
     ALOGE("%s: Creating CameraProvider failed.", __FUNCTION__);
@@ -63,7 +63,7 @@ std::unique_ptr<CameraProvider> CameraProvider::Create(
 
 status_t CameraProvider::Initialize(
     std::unique_ptr<CameraProviderHwl> camera_provider_hwl) {
-  ATRACE_CALL();
+  ATRACE_NAME("CameraProvider::Initialize");
   // Advertise the HAL vendor tags to the camera metadata framework before
   // creating a HWL provider.
   status_t res = VendorTagManager::GetInstance().AddTags(kHalVendorTagSections);
@@ -106,6 +106,7 @@ status_t CameraProvider::Initialize(
 }
 
 status_t CameraProvider::InitializeVendorTags() {
+  ATRACE_NAME("CameraProvider::InitializeVendorTags");
   std::vector<VendorTagSection> hwl_tag_sections;
   status_t res = camera_provider_hwl_->GetVendorTags(&hwl_tag_sections);
   if (res != OK) {
@@ -288,7 +289,7 @@ status_t CameraProvider::CreateCameraDevice(
 
 status_t CameraProvider::CreateHwl(
     std::unique_ptr<CameraProviderHwl>* camera_provider_hwl) {
-  ATRACE_CALL();
+  ATRACE_NAME("CameraProvider::CreateHwl");
 #if GCH_HWL_USE_DLOPEN
   CreateCameraProviderHwl_t create_hwl;
 

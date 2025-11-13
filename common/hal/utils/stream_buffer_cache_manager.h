@@ -73,6 +73,8 @@ struct StreamBufferCacheRegInfo {
   uint64_t consumer_flags = 0;
   // Number of buffers that the manager needs to cache
   uint32_t num_buffers_to_cache = 1;
+  // Group ID of the stream
+  int32_t group_id = kInvalidStreamGroupId;
 };
 
 //
@@ -202,6 +204,10 @@ class StreamBufferCacheManager {
                       IHalBufferAllocator* placeholder_buffer_allocator);
 
    private:
+    // Return whether the client has already started getting buffers.
+    // The cache_access_mutex_ must be locked when calling this function.
+    void SetClientGetBufferStatusLocked(bool has_started);
+
     // Flush all buffers acquired from the buffer provider. Return the acquired
     // buffers through the return_func.
     // The cache_access_mutex_ must be locked when calling this function.
@@ -255,9 +261,12 @@ class StreamBufferCacheManager {
     // BufferRequestResult must be set to true.
     StreamBuffer placeholder_buffer_;
     // StreamBufferCacheManager does not refill a StreamBufferCache until this
-    // is set true by the client. Client should set this flag to true after the
-    // buffer provider (e.g. framework) is ready to handle buffer requests, or
-    // when a new request is submitted for an idle camera device (no inflight
+    // is set true by the client. For group streams, we would
+    // start refill a StreamBufferCache only when client first get buffer, to
+    // avoid redundant cache buffer allocation of useless group streams, details
+    // can be found in b/420847957. Client should set this flag to true after
+    // the buffer provider (e.g. framework) is ready to handle buffer requests,
+    // or when a new request is submitted for an idle camera device (no inflight
     // requests).
     bool is_active_ = false;
     // Interface to notify the parent manager for new threadloop workload.
@@ -265,6 +274,11 @@ class StreamBufferCacheManager {
     // Allocator of the placeholder buffer for this stream. The stream buffer cache
     // manager owns this throughout the life cycle of this stream buffer cahce.
     IHalBufferAllocator* placeholder_buffer_allocator_ = nullptr;
+    // Whether the client has started getting buffer on the StreamBufferCache.
+    // The client should reset this flag to false when the stream buffer cache
+    // manager is deactivated or flush.
+    // Must be protected by cache_access_mutex_.
+    bool has_started_get_buffer_ = false;
   };
 
   // Add stream buffer cache. Lock caches_map_mutex_ before calling this func.

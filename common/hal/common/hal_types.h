@@ -35,6 +35,9 @@ using ::android::status_t;
 // Used to identify an invalid buffer handle.
 static constexpr buffer_handle_t kInvalidBufferHandle = nullptr;
 
+// Used to identify an invalid stream group id.
+static constexpr int32_t kInvalidStreamGroupId = -1;
+
 // See the definition of
 // ::android::hardware::camera::common::V1_0::TorchMode
 enum class TorchMode : uint32_t {

@@ -365,6 +365,11 @@ void MockDeviceSessionHwl::DelegateCallsToFakeSession() {
       .WillByDefault(Invoke(
           &fake_session_hwl_,
           &FakeCameraDeviceSessionHwl::GetPhysicalCameraCharacteristics));
+
+  ON_CALL(*this, IsFeatureCombinationSupported(_))
+      .WillByDefault(
+          Invoke(&fake_session_hwl_,
+                 &FakeCameraDeviceSessionHwl::IsFeatureCombinationSupported));
 }
 
 }  // namespace google_camera_hal

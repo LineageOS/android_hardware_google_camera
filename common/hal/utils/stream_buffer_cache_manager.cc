@@ -371,6 +371,7 @@ status_t StreamBufferCacheManager::StreamBufferCache::GetBuffer(
   std::unique_lock<std::mutex> cache_lock(cache_access_mutex_);
 
   // 0. the buffer cache must be active
+  SetClientGetBufferStatusLocked(/*has_started=*/true);
   if (!is_active_) {
     ALOGW("%s: The buffer cache for stream %d is not active.", __FUNCTION__,
           cache_info_.stream_id);
@@ -437,6 +438,15 @@ bool StreamBufferCacheManager::StreamBufferCache::IsStreamDeactivated() {
 void StreamBufferCacheManager::StreamBufferCache::SetManagerState(bool active) {
   std::unique_lock<std::mutex> lock(cache_access_mutex_);
   is_active_ = active;
+  if (!active) {
+    // When the SBC is deactivated, we reset the client get buffer status.
+    SetClientGetBufferStatusLocked(/*has_started=*/false);
+  }
+}
+
+void StreamBufferCacheManager::StreamBufferCache::SetClientGetBufferStatusLocked(
+    bool has_started) {
+  has_started_get_buffer_ = has_started;
 }
 
 status_t StreamBufferCacheManager::StreamBufferCache::FlushLocked(
@@ -454,6 +464,7 @@ status_t StreamBufferCacheManager::StreamBufferCache::FlushLocked(
 
   if (cached_buffers_.empty()) {
     ALOGV("%s: Stream buffer cache is already empty.", __FUNCTION__);
+    SetClientGetBufferStatusLocked(/*has_started=*/false);
     ReleasePlaceholderBufferLocked();
     return OK;
   }
@@ -465,6 +476,7 @@ status_t StreamBufferCacheManager::StreamBufferCache::FlushLocked(
   }
 
   cached_buffers_.clear();
+  SetClientGetBufferStatusLocked(/*has_started=*/false);
   ReleasePlaceholderBufferLocked();
 
   return OK;
@@ -555,6 +567,15 @@ status_t StreamBufferCacheManager::StreamBufferCache::Refill() {
 bool StreamBufferCacheManager::StreamBufferCache::RefillableLocked() const {
   // No need to refill if the buffer cache is not active.
   if (!is_active_) {
+    return false;
+  }
+
+  // For group streams, we would start refill buffer caches only after first
+  // get buffer from the client, to avoid cache buffer allocation before using.
+  if (cache_info_.group_id != kInvalidStreamGroupId &&
+      !has_started_get_buffer_) {
+    ALOGV("%s: skip refilling for group stream %d.", __FUNCTION__,
+          cache_info_.stream_id);
     return false;
   }
 

@@ -31,6 +31,7 @@
 #include <utils/Errors.h>
 
 #include <cinttypes>
+#include <ctime>
 
 #include "aidl_camera_build_version.h"
 #include "aidl_camera_provider.h"
@@ -48,6 +49,8 @@ const std::string kProviderInstance = "/internal/0";
 
 int main() {
   ALOGI("Google camera provider service is starting.");
+  timespec start_time;
+  clock_gettime(CLOCK_BOOTTIME, &start_time);
   mallopt(M_DECAY_TIME, 1);
   android::hardware::configureRpcThreadpool(/*maxThreads=*/6,
                                             /*callerWillJoin=*/true);
@@ -98,6 +101,14 @@ int main() {
       return android::NO_INIT;
     }
   }
+  timespec end_time;
+  clock_gettime(CLOCK_BOOTTIME, &end_time);
+  const uint32_t timestamp_start = static_cast<uint32_t>(
+      start_time.tv_sec * 1000 + (start_time.tv_nsec / 1000000L));
+  const uint32_t timestamp_stop = static_cast<uint32_t>(
+      end_time.tv_sec * 1000 + (end_time.tv_nsec / 1000000L));
+  ALOGI("Google camera provider start time: %d ms",
+        timestamp_stop - timestamp_start);
   androidSetThreadName("google.camera.provider");
   ABinderProcess_joinThreadPool();
 
