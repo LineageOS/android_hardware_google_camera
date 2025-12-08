@@ -16,9 +16,11 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "GCH_CameraIdManager"
+#include "camera_id_manager.h"
+
 #include <log/log.h>
 
-#include "camera_id_manager.h"
+#include <algorithm>
 
 namespace android {
 namespace google_camera_hal {

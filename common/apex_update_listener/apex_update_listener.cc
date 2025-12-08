@@ -1,9 +1,15 @@
 #include "apex_update_listener.h"
+
 #include <log/log.h>
 #include <sys/inotify.h>
 #include <sys/types.h>
 #include <tinyxml2.h>
+
+#include <cstdlib>
 #include <fstream>
+#include <memory>
+#include <optional>
+#include <set>
 #include <sstream>
 #include <streambuf>
 #include <string>

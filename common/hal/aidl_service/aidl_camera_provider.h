@@ -53,6 +53,8 @@ class AidlCameraProvider : public BnCameraProvider {
   static std::shared_ptr<AidlCameraProvider> Create();
   virtual ~AidlCameraProvider() = default;
 
+  binder_status_t dump(int fd, const char**, uint32_t) override;
+
   // Override functions in ICameraProvider.
 
   ScopedAStatus setCallback(

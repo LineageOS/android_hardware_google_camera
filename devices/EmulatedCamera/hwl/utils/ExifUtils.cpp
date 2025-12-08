@@ -22,9 +22,9 @@
 
 #include <inttypes.h>
 #include <log/log.h>
-#include <math.h>
 #include <stdint.h>
 
+#include <cmath>
 #include <string>
 #include <vector>
 

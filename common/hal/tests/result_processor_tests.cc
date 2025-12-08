@@ -18,7 +18,10 @@
 #include <gtest/gtest.h>
 #include <log/log.h>
 
+#include <functional>
 #include <memory>
+#include <utility>
+#include <vector>
 
 #include "basic_result_processor.h"
 

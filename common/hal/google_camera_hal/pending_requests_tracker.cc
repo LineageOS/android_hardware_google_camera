@@ -166,6 +166,14 @@ status_t PendingRequestsTracker::TrackReturnedAcquiredBuffers(
         // buffer managed
         continue;
       }
+      if (buffer.buffer_id <= 0) {
+        // HWL can return the capture result with an invalid buffer when it
+        // gets a frame drop before requesting the framework buffer due to some
+        // reasons, e.g., Flush, and early pipeline errors. This shouldn't be
+        // counted as the buffer return, as it actually didn't return any
+        // framework buffer.
+        continue;
+      }
       if (stream_acquired_buffers_[stream_id] == 0) {
         if (buffer.status == BufferStatus::kOk) {
           ALOGE("%s: stream %d should not have any pending acquired buffers.",

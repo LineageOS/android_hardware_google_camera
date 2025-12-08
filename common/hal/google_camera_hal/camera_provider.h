@@ -37,6 +37,9 @@ class CameraProvider {
       std::unique_ptr<CameraProviderHwl> camera_provider_hwl = nullptr);
   virtual ~CameraProvider();
 
+  // Dump the camera provider states in fd.
+  status_t DumpState(int fd);
+
   // Set callback functions.
   status_t SetCallback(const CameraProviderCallback* callback);
 

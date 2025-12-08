@@ -42,6 +42,11 @@ CameraProvider::~CameraProvider() {
   }
 }
 
+status_t CameraProvider::DumpState(int fd) {
+  ATRACE_CALL();
+  return camera_provider_hwl_->DumpState(fd);
+}
+
 std::unique_ptr<CameraProvider> CameraProvider::Create(
     std::unique_ptr<CameraProviderHwl> camera_provider_hwl) {
   ATRACE_NAME("CameraProvider::Create");

@@ -38,22 +38,6 @@ gch_hal_cc_defaults {
     },
 }
 
-aconfig_declarations {
-    name: "libgooglecamerahal_flags",
-    package: "libgooglecamerahal.flags",
-    container: "vendor",
-    srcs: ["libgooglecamerahal_flags.aconfig"],
-}
-
-cc_aconfig_library {
-    name: "libgooglecamerahal_flags_cc_lib",
-    aconfig_declarations: "libgooglecamerahal_flags",
-    defaults: ["google_camera_hal_defaults"],
-    host_supported: true,
-    owner: "google",
-    vendor: true,
-}
-
 cc_library_shared {
     name: "libgooglecamerahal",
     defaults: [
@@ -89,7 +73,6 @@ cc_library_shared {
         "libbase",
         "libcamera_metadata",
         "libcutils",
-        "libgooglecamerahal_flags_cc_lib",
         "libgooglecamerahalutils",
         "libhidlbase",
         "liblog",

@@ -8,6 +8,7 @@ cc_defaults {
     owner: "google",
     proprietary: true,
     srcs: [
+        "ConfigUtils.cpp",
         "EmulatedCameraProviderHWLImpl.cpp",
         "EmulatedCameraDeviceInfo.cpp",
         "EmulatedCameraDeviceHWLImpl.cpp",

@@ -96,7 +96,7 @@ class RealtimeProcessBlock : public ProcessBlock {
   std::mutex result_processor_lock_;
 
   // Result processor. Must be protected by result_processor_lock_.
-  std::unique_ptr<ResultProcessor> result_processor_ = nullptr;
+  std::unique_ptr<ResultProcessor> result_processor_;
 };
 
 }  // namespace google_camera_hal

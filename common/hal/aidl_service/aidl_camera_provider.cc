@@ -179,6 +179,11 @@ status_t AidlCameraProvider::Initialize() {
   return OK;
 }
 
+binder_status_t AidlCameraProvider::dump(int fd, const char** /*args*/, uint32_t /*numArgs*/) {
+  google_camera_provider_->DumpState(fd);
+  return OK;
+}
+
 ScopedAStatus AidlCameraProvider::setCallback(
     const std::shared_ptr<ICameraProviderCallback>& callback) {
   if (callback == nullptr) {

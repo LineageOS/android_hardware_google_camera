@@ -19,6 +19,7 @@
 
 #include <gmock/gmock.h>
 #include <process_block.h>
+#include <result_processor.h>
 
 namespace android {
 namespace google_camera_hal {

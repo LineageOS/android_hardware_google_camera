@@ -75,16 +75,23 @@ status_t GrallocBufferAllocator::AllocateBuffers(
   ConvertHalBufferDescriptor(buffer_descriptor, &gralloc_buffer_descriptor);
 
   status_t err = OK;
-  uint32_t stride = 0;
   for (uint32_t i = 0; i < gralloc_buffer_descriptor.num_buffers; i++) {
     buffer_handle_t buffer;
-    err = GraphicBufferAllocator::get().allocate(
-        gralloc_buffer_descriptor.width, gralloc_buffer_descriptor.height,
-        gralloc_buffer_descriptor.format, /*layerCount*/ 1u,
-        android_convertGralloc1To0Usage(
+    GraphicBufferAllocator::AllocationRequest request = {
+        .importBuffer = true,
+        .width = gralloc_buffer_descriptor.width,
+        .height = gralloc_buffer_descriptor.height,
+        .format = gralloc_buffer_descriptor.format,
+        .layerCount = 1u,
+        .usage = static_cast<uint64_t>(android_convertGralloc1To0Usage(
             gralloc_buffer_descriptor.producer_flags,
-            gralloc_buffer_descriptor.consumer_flags),
-        &buffer, &stride, "GCHGrallocBufferAllocator");
+            gralloc_buffer_descriptor.consumer_flags)),
+        .requestorName = "GCHGrallocBufferAllocator",
+    };
+    GraphicBufferAllocator::AllocationResult result =
+        GraphicBufferAllocator::get().allocate(request);
+    err = result.status;
+    buffer = result.handle;
     if (err != OK) {
       ALOGE("%s: Failed to allocate gralloc buffer: %s(%d)", __FUNCTION__,
             strerror(-err), err);

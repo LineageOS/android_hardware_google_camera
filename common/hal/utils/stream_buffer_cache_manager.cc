@@ -25,6 +25,7 @@
 #include <log/log.h>
 #include <sync/sync.h>
 #include <sys/resource.h>
+#include <utils/Errors.h>
 #include <utils/Trace.h>
 
 #include <chrono>
@@ -39,6 +40,11 @@ namespace google_camera_hal {
 // setprop key for raising buffer allocation priority
 inline constexpr char kRaiseBufAllocationPriority[] =
     "persist.vendor.camera.raise_buf_allocation_priority";
+// System property to disable placeholder buffer. If this property is true,
+// StreamBufferCache will return error directly instead of returning a
+// placeholder buffer when no buffer is available from the provider.
+inline constexpr char kDisablePlaceholderBuffer[] =
+    "vendor.camera.debug.disable_placeholder_buffer";
 
 // For CTS testCameraDeviceCaptureFailure, it holds image buffers and hal hits
 // refill buffer timeout. Large timeout time also results in close session time
@@ -341,6 +347,8 @@ StreamBufferCacheManager::StreamBufferCache::StreamBufferCache(
   std::lock_guard<std::mutex> lock(cache_access_mutex_);
   notify_for_workload_ = notify;
   placeholder_buffer_allocator_ = placeholder_buffer_allocator;
+  disable_placeholder_buffer_ =
+      property_get_bool(kDisablePlaceholderBuffer, true);
 }
 
 status_t StreamBufferCacheManager::StreamBufferCache::UpdateCache(
@@ -380,9 +388,15 @@ status_t StreamBufferCacheManager::StreamBufferCache::GetBuffer(
 
   // 1. check if the cache is deactived
   if (stream_deactived_) {
-    res->is_placeholder_buffer = true;
-    res->buffer = placeholder_buffer_;
-    return OK;
+    if (disable_placeholder_buffer_) {
+      // If the stream is deactivated and placeholder buffers are disabled,
+      // return an error to signal that no buffer is available.
+      return INVALID_OPERATION;
+    } else {
+      res->is_placeholder_buffer = true;
+      res->buffer = placeholder_buffer_;
+      return OK;
+    }
   }
 
   // 2. check if there is any buffer available in the cache. If not, try
@@ -410,17 +424,21 @@ status_t StreamBufferCacheManager::StreamBufferCache::GetBuffer(
 
   // 3. use placeholder buffer if the cache is still empty
   if (cached_buffers_.empty()) {
-    // Only allocate placeholder buffer for the first time
-    if (placeholder_buffer_.buffer == nullptr) {
-      status_t result = AllocatePlaceholderBufferLocked();
-      if (result != OK) {
-        ALOGE("%s: Allocate placeholder buffer failed.", __FUNCTION__);
-        return UNKNOWN_ERROR;
+    if (disable_placeholder_buffer_) {
+      return INVALID_OPERATION;
+    } else {
+      // Only allocate placeholder buffer for the first time
+      if (placeholder_buffer_.buffer == nullptr) {
+        status_t result = AllocatePlaceholderBufferLocked();
+        if (result != OK) {
+          ALOGE("%s: Allocate placeholder buffer failed.", __FUNCTION__);
+          return UNKNOWN_ERROR;
+        }
       }
+      res->is_placeholder_buffer = true;
+      res->buffer = placeholder_buffer_;
+      return OK;
     }
-    res->is_placeholder_buffer = true;
-    res->buffer = placeholder_buffer_;
-    return OK;
   } else {
     res->is_placeholder_buffer = false;
     res->buffer = cached_buffers_.back();
@@ -520,7 +538,7 @@ status_t StreamBufferCacheManager::StreamBufferCache::Refill() {
       cache_info_.request_func(num_buffers_to_acquire, &buffers, &req_status);
 
   std::unique_lock<std::mutex> cache_lock(cache_access_mutex_);
-  if (res != OK) {
+  if (res != OK && !disable_placeholder_buffer_) {
     status_t result = AllocatePlaceholderBufferLocked();
     if (result != OK) {
       ALOGE("%s: Allocate placeholder buffer failed.", __FUNCTION__);
@@ -545,8 +563,10 @@ status_t StreamBufferCacheManager::StreamBufferCache::Refill() {
             "%s: Stream %d is disconnected or unknown error observed."
             "This stream is marked as inactive.",
             __FUNCTION__, cache_info_.stream_id);
-        ALOGI("%s: Stream %d begin to use placeholder buffer.", __FUNCTION__,
-              cache_info_.stream_id);
+        if (!disable_placeholder_buffer_) {
+          ALOGI("%s: Stream %d begin to use placeholder buffer.", __FUNCTION__,
+                cache_info_.stream_id);
+        }
         stream_deactived_ = true;
         break;
       default:
@@ -579,8 +599,8 @@ bool StreamBufferCacheManager::StreamBufferCache::RefillableLocked() const {
     return false;
   }
 
-  // Need to refill if the cache is empty.
-  return cached_buffers_.empty();
+  // Need to refill if the cache is not full
+  return cached_buffers_.size() < cache_info_.num_buffers_to_cache;
 }
 
 status_t

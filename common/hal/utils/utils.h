@@ -19,6 +19,8 @@
 
 #include <log/log.h>
 
+#include <algorithm>
+#include <cmath>
 #include <map>
 #include <set>
 #include <utility>

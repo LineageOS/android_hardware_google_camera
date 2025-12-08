@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <cstdlib>
 #include <string>
 #include <unordered_map>
 

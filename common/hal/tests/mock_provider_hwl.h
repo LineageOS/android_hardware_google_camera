@@ -33,6 +33,16 @@ class MockProviderHwl : public CameraProviderHwl {
 
   virtual ~MockProviderHwl() = default;
 
+  status_t DumpState(int fd) {
+    if (fd < 0) {
+      return BAD_VALUE;
+    }
+
+    dprintf(fd, "Mock provider HWL DumpState\n");
+
+    return OK;
+  }
+
   // Override functions in CameraProviderHwl.
   status_t SetCallback(const HwlCameraProviderCallback& callback) override {
     const HwlCameraProviderCallback* hwl_camera_provider_callback = &callback;

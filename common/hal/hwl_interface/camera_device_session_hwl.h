@@ -194,6 +194,12 @@ class CameraDeviceSessionHwl : public PhysicalCameraInfoHwl {
     return 1;
   }
 
+  // Get number of stream buffers to cache. Default to prefetch one buffer, and
+  // is configurable from Lyric via Mendel flags or system properties.
+  virtual int GetStreamBufferPrefetchSize() const {
+    return 1;
+  }
+
   // Get customized profiler
   virtual std::unique_ptr<google::camera_common::Profiler> GetProfiler(
       uint32_t /* camera_id */, int /* option */) {

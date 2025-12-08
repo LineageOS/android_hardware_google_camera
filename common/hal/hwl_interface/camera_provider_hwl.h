@@ -57,6 +57,9 @@ class CameraProviderHwl {
   virtual status_t GetConcurrentStreamingCameraIds(
       std::vector<std::unordered_set<uint32_t>>* combinations) = 0;
 
+  // Dump the camera provider states in fd.
+  virtual status_t DumpState(int fd) = 0;
+
   // Return if setting torch mode API is supported. Not all camera devices
   // support torch mode so enabling torch mode for a devices is okay to
   // fail if the camera device doesn't support torch mode.

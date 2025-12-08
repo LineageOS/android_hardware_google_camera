@@ -272,13 +272,16 @@ class StreamBufferCacheManager {
     // Interface to notify the parent manager for new threadloop workload.
     NotifyManagerThreadWorkloadFunc notify_for_workload_ = nullptr;
     // Allocator of the placeholder buffer for this stream. The stream buffer cache
-    // manager owns this throughout the life cycle of this stream buffer cahce.
+    // manager owns this throughout the life cycle of this stream buffer cache.
     IHalBufferAllocator* placeholder_buffer_allocator_ = nullptr;
     // Whether the client has started getting buffer on the StreamBufferCache.
     // The client should reset this flag to false when the stream buffer cache
     // manager is deactivated or flush.
     // Must be protected by cache_access_mutex_.
     bool has_started_get_buffer_ = false;
+    // Whether to disable placeholder buffer. If it's true, SBC will return
+    // error directly instead of returning placeholder buffer.
+    bool disable_placeholder_buffer_ = false;
   };
 
   // Add stream buffer cache. Lock caches_map_mutex_ before calling this func.

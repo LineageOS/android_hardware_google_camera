@@ -25,7 +25,6 @@
 #include "basic_request_processor.h"
 #include "basic_result_processor.h"
 #include "hal_types.h"
-#include "libgooglecamerahal_flags.h"
 #include "realtime_process_block.h"
 
 namespace android {
@@ -226,9 +225,6 @@ status_t BasicCaptureSession::Initialize(
   std::string result_dispatcher_name =
       "Cam" + std::to_string(device_session_hwl_->GetCameraId()) +
       "_ResultDispatcher";
-  if (!libgooglecamerahal::flags::batched_shutter_notifications()) {
-    notify_batch = nullptr;
-  }
   result_dispatcher_ = ResultDispatcher::Create(
       partial_result_count, std::move(process_capture_result),
       std::move(process_batch_capture_result), std::move(notify),

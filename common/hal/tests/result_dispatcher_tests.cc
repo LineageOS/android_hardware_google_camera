@@ -19,9 +19,16 @@
 #include <gtest/gtest.h>
 #include <log/log.h>
 
+#include <algorithm>
+#include <chrono>
+#include <condition_variable>
+#include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
 #include "hal_types.h"
 #include "result_dispatcher.h"

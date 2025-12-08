@@ -1,10 +1,14 @@
 #pragma once
 
+#include <atomic>
+#include <functional>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <string>
 #include <string_view>
 #include <thread>
+#include <utility>
 
 class ApexUpdateListener {
  private:

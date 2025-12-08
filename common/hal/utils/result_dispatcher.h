@@ -291,7 +291,6 @@ class ResultDispatcher {
   // Dump a StreamKey to a debug string
   inline std::string DumpStreamKey(const StreamKey& stream_key) const;
 
-  std::mutex process_capture_result_lock_;
   ProcessCaptureResultFunc process_capture_result_;
   ProcessBatchCaptureResultFunc process_batch_capture_result_;
   NotifyFunc notify_;

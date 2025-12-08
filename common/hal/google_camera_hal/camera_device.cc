@@ -136,6 +136,8 @@ static void UnpinVma(const Vma& vma) {
 // config but aren't any longer, and madvising anonymous VMAs.
 static void LoadLibraries(google_camera_hal::HwlMemoryConfig memory_config,
                           google_camera_hal::HwlMemoryConfig old_memory_config) {
+  ALOGI("Pinning memory config is set to %zu shared libraries.",
+        memory_config.pinned_libraries.size());
   auto vmaCollectorCb = [&memory_config, &old_memory_config](const Vma& vma) {
     // Read ahead for anonymous VMAs and for specific files.
     // vma.flags represents a VMAs rwx bits.
@@ -207,8 +209,6 @@ std::unique_ptr<CameraDevice> CameraDevice::Create(
   android::google_camera_hal::HwlMemoryConfig memory_config =
       device->camera_device_hwl_->GetMemoryConfig();
   memory_config.madvise_map_size_limit_bytes = 0;
-  ALOGI("Pinning memory for %zu shared libraries.",
-        memory_config.pinned_libraries.size());
 
   std::lock_guard<std::mutex> lock(applied_memory_config_mutex_);
   std::thread t(LoadLibraries, memory_config, device->GetAppliedMemoryConfig());
